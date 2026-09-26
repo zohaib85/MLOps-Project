@@ -24,6 +24,7 @@ serve: ## Run vLLM locally (Docker + GPU) from config/model.yaml
 	@IMAGE=$$($(PYTHON) scripts/vllm_args.py --image) && \
 	ARGS=$$($(PYTHON) scripts/vllm_args.py) && \
 	echo "Starting $$IMAGE" && \
+	{ docker rm -f $(CONTAINER) >/dev/null 2>&1 || true; } && \
 	docker run -d --name $(CONTAINER) --gpus all --ipc=host \
 	  -p 127.0.0.1:$(PORT):8000 \
 	  -v hf-cache:/root/.cache/huggingface \

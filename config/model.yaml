@@ -43,6 +43,8 @@ runtime:
   # Official vLLM OpenAI-compatible server image, pinned by digest (tags can be re-pushed; digests can't).
   # cu129 variant chosen deliberately: CUDA 12.x images run on any NVIDIA driver >= 525 (minor-version
   # compatibility), whereas the default CUDA 13 build needs driver >= 580 — AKS GPU node images may lag.
+  # v0.30.0-cu129 rejected: ships a cu130 torch with cu129 torchvision and crashes at import
+  # ("operator torchvision::nms does not exist") — https://github.com/vllm-project/vllm/issues/56829
   image: docker.io/vllm/vllm-openai
-  version: v0.30.0-cu129
-  digest: sha256:a67f8f186d4567612ac37a55bd82295006002b18858eb12a8af2f05f86c2ae3f
+  version: v0.29.0-cu129
+  digest: sha256:7ef5a35d1ef8ce2cf9d671dd91eec6e367c5849262e0362b4d3d4a26be0d87d2
