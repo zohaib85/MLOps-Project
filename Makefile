@@ -3,6 +3,12 @@ SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
 KIND_CLUSTER ?= llm-platform
+PYTHON       ?= python3
+CONTAINER    ?= vllm-local
+PORT         ?= 8000
+# Laptop GPU (8GB, shared with desktop) — leave headroom. AKS uses the value in config/model.yaml.
+GPU_MEMORY_UTILIZATION ?= 0.60
+export GPU_MEMORY_UTILIZATION
 
 define todo
 	@echo "TODO: '$@' is implemented in $(1) — see docs/PLAN.md"; exit 1
@@ -13,9 +19,20 @@ help: ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
 
 ## --- Week 1: inference baseline ---
-.PHONY: serve smoke test
-serve: ## Run vLLM locally with the pinned model config
-	$(call todo,Week 1 step 2)
+.PHONY: serve stop logs smoke test
+serve: ## Run vLLM locally (Docker + GPU) from config/model.yaml
+	@IMAGE=$$($(PYTHON) scripts/vllm_args.py --image) && \
+	ARGS=$$($(PYTHON) scripts/vllm_args.py) && \
+	echo "Starting $$IMAGE" && \
+	docker run -d --name $(CONTAINER) --gpus all --ipc=host \
+	  -p 127.0.0.1:$(PORT):8000 \
+	  -v hf-cache:/root/.cache/huggingface \
+	  $$IMAGE $$ARGS && \
+	echo "Loading model... follow with 'make logs'; ready when http://localhost:$(PORT)/health returns 200"
+stop: ## Stop and remove the local vLLM container
+	-docker rm -f $(CONTAINER)
+logs: ## Follow local vLLM logs
+	docker logs -f $(CONTAINER)
 smoke: ## Run API smoke tests against a running endpoint
 	$(call todo,Week 1 step 3)
 test: ## Run unit tests

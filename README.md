@@ -38,6 +38,7 @@ _Filled in at the end of Week 1._ Run `make help` to see available targets.
 - [Build plan](docs/PLAN.md)
 - [Architecture decision records](docs/adr/)
 - [AKS learning notes](docs/learning/aks-notes.md)
+- [Local GPU dev setup (Windows + WSL2)](docs/learning/local-gpu-setup.md)
 
 ## Scope & limitations
 
