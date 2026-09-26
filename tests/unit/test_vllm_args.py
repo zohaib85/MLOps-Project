@@ -51,9 +51,11 @@ def test_load_rejects_unpinned_revision(tmp_path, repo_root):
         vllm_args.load(bad)
 
 
-def test_prompt_set_is_well_formed(repo_root):
-    ps = yaml.safe_load((repo_root / "app" / "prompts" / "smoke-v1.yaml").read_text())
-    assert ps["version"] == "smoke-v1"
+@pytest.mark.parametrize("name", ["smoke-v1", "smoke-v2"])
+def test_prompt_set_is_well_formed(repo_root, name):
+    ps = yaml.safe_load((repo_root / "app" / "prompts" / f"{name}.yaml").read_text())
+    assert ps["version"] == name, "version field must match filename"
+    assert 0 < ps.get("min_pass_rate", 1.0) <= 1
     ids = [p["id"] for p in ps["prompts"]]
     assert len(ids) == len(set(ids)), "prompt ids must be unique"
     for p in ps["prompts"]:
