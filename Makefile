@@ -24,7 +24,7 @@ help: ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
 
 ## --- Week 1: inference baseline ---
-.PHONY: serve stop logs smoke test
+.PHONY: serve stop logs clean-local smoke test
 serve: ## Run vLLM locally (Docker + GPU) from config/model.yaml
 	@IMAGE=$$($(PYTHON) scripts/vllm_args.py --image) && \
 	ARGS=$$($(PYTHON) scripts/vllm_args.py) && \
@@ -40,6 +40,8 @@ stop: ## Stop and remove the local vLLM container
 	-docker rm -f $(CONTAINER)
 logs: ## Follow local vLLM logs
 	docker logs -f $(CONTAINER)
+clean-local: stop ## Remove local container AND cached model weights (hf-cache volume)
+	-docker volume rm hf-cache
 smoke: ## Smoke-test a running endpoint (BASE_URL, default localhost:8000)
 	$(PYTHON) -m pytest tests/smoke -v
 test: ## Run unit tests (no server needed)
