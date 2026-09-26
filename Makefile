@@ -40,10 +40,10 @@ stop: ## Stop and remove the local vLLM container
 	-docker rm -f $(CONTAINER)
 logs: ## Follow local vLLM logs
 	docker logs -f $(CONTAINER)
-smoke: ## Run API smoke tests against a running endpoint
-	$(call todo,Week 1 step 3)
-test: ## Run unit tests
-	$(call todo,Week 1 step 3)
+smoke: ## Smoke-test a running endpoint (BASE_URL, default localhost:8000)
+	$(PYTHON) -m pytest tests/smoke -v
+test: ## Run unit tests (no server needed)
+	$(PYTHON) -m pytest
 
 ## --- Week 2: packaging, delivery, infrastructure ---
 .PHONY: lint kind-up kind-down infra-up infra-down
