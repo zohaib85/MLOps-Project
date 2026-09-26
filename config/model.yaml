@@ -8,7 +8,7 @@ model:
   # Exact HF commit SHA — never a branch name like "main" (branches move; SHAs don't).
   # Get it with:
   #   curl -s https://huggingface.co/api/models/Qwen/Qwen2.5-0.5B-Instruct | jq -r .sha
-  revision: REPLACE_WITH_COMMIT_SHA
+  revision: 7ae557604adf67be50417f59c2c2f167def9a775
   # Name clients use in the OpenAI API "model" field; decoupled from the HF id so
   # we can swap revisions without breaking clients.
   served_name: qwen2.5-0.5b-instruct
@@ -36,10 +36,13 @@ hardware_profile:
   vm_size: Standard_NC4as_T4_v3
   gpu: NVIDIA T4 16GB
   gpu_count: 1
-  local_dev: cpu   # laptop / kind — correctness only, never benchmarked
+  # Laptop: RTX A2000 8GB via WSL2 + Docker. Dev/correctness only — never used for published benchmarks.
+  local_dev: rtx-a2000-8gb
 
 runtime:
-  # Official vLLM OpenAI-compatible server image. Pinned to a digest in Week 1 step 4.
-  image: vllm/vllm-openai
-  version: TBD
-  digest: TBD
+  # Official vLLM OpenAI-compatible server image, pinned by digest (tags can be re-pushed; digests can't).
+  # cu129 variant chosen deliberately: CUDA 12.x images run on any NVIDIA driver >= 525 (minor-version
+  # compatibility), whereas the default CUDA 13 build needs driver >= 580 — AKS GPU node images may lag.
+  image: docker.io/vllm/vllm-openai
+  version: v0.30.0-cu129
+  digest: sha256:a67f8f186d4567612ac37a55bd82295006002b18858eb12a8af2f05f86c2ae3f

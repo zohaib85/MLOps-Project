@@ -15,7 +15,7 @@ Build window: 24 Sep – 21 Oct 2026 · ~8–10 h/week · personal learning proj
 | Our image | Eval/load/smoke harness (`app/`) | Built, scanned, published by digest in CI |
 | GitOps | Argo CD, same repo, `deploy/` path | CI commits digest bump; CI never holds cluster creds |
 | Gateway | vLLM `--api-key` + ingress-nginx rate limits | Minimal; Envoy Gateway deferred |
-| Local dev | Docker + kind, CPU / tiny model or mock | GPU only for integration + evidence runs |
+| Local dev | WSL2 + Docker on RTX A2000 8GB; kind for cluster work | Laptop GPU for dev; T4 on AKS for evidence runs |
 
 ## Steps
 
@@ -28,7 +28,7 @@ Build window: 24 Sep – 21 Oct 2026 · ~8–10 h/week · personal learning proj
 - [ ] GitHub milestones for Weeks 1–4
 
 ### Week 1 — Inference baseline (exit: API + smoke test)
-- [ ] 1. `config/model.yaml`: model, revision, licence, context, serving params
+- [x] 1. `config/model.yaml`: model, revision, licence, context, serving params
 - [ ] 2. `make serve` locally; verify `/v1/models`, `/health`, one chat call
 - [ ] 3. pytest smoke tests + versioned fixed prompt set; assert model/revision
 - [ ] 4. Pinned image + docs (setup, teardown, cache, limitations)
