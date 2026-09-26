@@ -9,6 +9,11 @@ PORT         ?= 8000
 # Laptop GPU (8GB, shared with desktop) — leave headroom. AKS uses the value in config/model.yaml.
 GPU_MEMORY_UTILIZATION ?= 0.60
 export GPU_MEMORY_UTILIZATION
+# WSL2 disables pinned host memory by default; vLLM's V2 model runner needs it ("UVA is not available").
+IS_WSL := $(shell grep -qi microsoft /proc/version 2>/dev/null && echo 1)
+WSL_DOCKER_ARGS := $(if $(IS_WSL),-e VLLM_WSL2_ENABLE_PIN_MEMORY=1)
+# Extra docker run flags, e.g. EXTRA_DOCKER_ARGS="-e VLLM_USE_V2_MODEL_RUNNER=0"
+EXTRA_DOCKER_ARGS ?=
 
 define todo
 	@echo "TODO: '$@' is implemented in $(1) — see docs/PLAN.md"; exit 1
@@ -28,6 +33,7 @@ serve: ## Run vLLM locally (Docker + GPU) from config/model.yaml
 	docker run -d --name $(CONTAINER) --gpus all --ipc=host \
 	  -p 127.0.0.1:$(PORT):8000 \
 	  -v hf-cache:/root/.cache/huggingface \
+	  $(WSL_DOCKER_ARGS) $(EXTRA_DOCKER_ARGS) \
 	  $$IMAGE $$ARGS && \
 	echo "Loading model... follow with 'make logs'; ready when http://localhost:$(PORT)/health returns 200"
 stop: ## Stop and remove the local vLLM container

@@ -39,7 +39,7 @@ def server_args(cfg: dict) -> list[str]:
     # Laptop GPUs share memory with other processes; allow a local override.
     gpu_util = os.environ.get("GPU_MEMORY_UTILIZATION", s["gpu_memory_utilization"])
     return [
-        "--model", m["id"],
+        m["id"],  # positional: `vllm serve <model>` (--model is deprecated)
         "--revision", m["revision"],
         "--tokenizer-revision", m["revision"],
         "--served-model-name", m["served_name"],
