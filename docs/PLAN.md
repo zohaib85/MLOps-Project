@@ -31,7 +31,7 @@ Build window: 24 Sep – 21 Oct 2026 · ~8–10 h/week · personal learning proj
 - [x] 1. `config/model.yaml`: model, revision, licence, context, serving params
 - [x] 2. `make serve` locally; verify `/v1/models`, `/health`, one chat call
 - [x] 3. pytest smoke tests + versioned fixed prompt set; assert model/revision
-- [ ] 4. Pinned image + docs (setup, teardown, cache, limitations)
+- [x] 4. Pinned image + docs (setup, teardown, cache, limitations)
 - [ ] 5. Exit gate: clean environment reproduces a valid response
 
 ### Week 2 — Kubernetes + GitOps (exit: reproducible release)

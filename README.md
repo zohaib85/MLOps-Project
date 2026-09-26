@@ -29,9 +29,46 @@ docs/                # plan, ADRs, runbook, benchmark report
 Makefile             # one-command workflows (`make help`)
 ```
 
-## Quick start
+## Quick start (local GPU)
 
-_Filled in at the end of Week 1._ Run `make help` to see available targets.
+**Prerequisites:** Linux or WSL2, Docker with NVIDIA GPU support (`docker run --rm --gpus all nvidia/cuda:12.9.1-base-ubuntu24.04 nvidia-smi` works), ≥ 6 GB GPU memory, Python 3.10+, `make`, ~15 GB free disk.
+Windows users: follow [docs/learning/local-gpu-setup.md](docs/learning/local-gpu-setup.md) first.
+
+```bash
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements-dev.txt
+
+make test     # unit tests — config pinning + arg rendering, no GPU needed
+make serve    # start vLLM (pinned image + model revision from config/model.yaml)
+make logs     # wait for "Application startup complete", then Ctrl+C
+make smoke    # health, model identity, API contract, determinism, prompt-set pass rate
+```
+
+Send a request yourself:
+
+```bash
+curl -s localhost:8000/v1/chat/completions -H 'Content-Type: application/json' -d '{
+  "model": "qwen2.5-0.5b-instruct",
+  "messages": [{"role": "user", "content": "In one sentence, what is Kubernetes?"}],
+  "temperature": 0, "max_tokens": 64}' | jq -r '.choices[0].message.content'
+```
+
+### Teardown
+
+| Command | Removes | Keeps |
+|---|---|---|
+| `make stop` | the vLLM container (frees GPU) | image + model cache — next start is fast |
+| `make clean-local` | container **and** `hf-cache` volume (~1 GB model) | vLLM image |
+| `docker rmi $(python3 scripts/vllm_args.py --image)` | vLLM image (~9 GB) | — |
+
+### Where things live
+
+| What | Where | Why |
+|---|---|---|
+| Model identity + serving params | `config/model.yaml` | Single source of truth for local, Helm, tests, benchmarks |
+| Model weights | Docker volume `hf-cache` → `/root/.cache/huggingface` in the container | Downloaded once at the pinned revision; never in Git |
+| Smoke-run records | `results/raw/smoke-*.json` (git-ignored) | Each run tagged with model revision, image digest, prompt-set version |
+| Regression prompts | `app/prompts/smoke-v*.yaml` | Versioned; never edited in place |
 
 ## Documentation
 
@@ -42,4 +79,9 @@ _Filled in at the end of Week 1._ Run `make help` to see available targets.
 
 ## Scope & limitations
 
-Single model, single GPU node profile, one Azure region. Deliberately excludes training/fine-tuning, multi-node inference, and RAG. Prompts are synthetic; no user data is processed.
+- **Scope:** single model, single GPU node profile, one Azure region. Deliberately excludes training/fine-tuning, multi-node inference, and RAG. Prompts are synthetic; no user data is processed.
+- **Model quality:** Qwen2.5-0.5B-Instruct is chosen for cost and fast iteration, not answer quality. Known miss: answers "Docker" to the Kubernetes prompt (tracked in `smoke-v2`).
+- **Local ≠ target:** laptop runs (RTX A2000 via WSL2) are for development only and need a WSL-specific setting (`VLLM_WSL2_ENABLE_PIN_MEMORY=1`). Published numbers come only from the AKS T4 environment.
+- **No auth locally:** the local endpoint binds to `127.0.0.1` only. Authentication and rate limiting arrive with the Kubernetes gateway (Week 2).
+- **Pinned runtime:** vLLM `v0.29.0-cu129`. `v0.30.0-cu129` was rejected (broken torch/torchvision build — see `config/model.yaml`).
+- **Evidence:** [Week 1 local baseline](docs/evidence/week1-local-baseline.md)
