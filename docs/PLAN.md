@@ -29,8 +29,8 @@ Build window: 24 Sep – 21 Oct 2026 · ~8–10 h/week · personal learning proj
 
 ### Week 1 — Inference baseline (exit: API + smoke test)
 - [x] 1. `config/model.yaml`: model, revision, licence, context, serving params
-- [ ] 2. `make serve` locally; verify `/v1/models`, `/health`, one chat call
-- [ ] 3. pytest smoke tests + versioned fixed prompt set; assert model/revision
+- [x] 2. `make serve` locally; verify `/v1/models`, `/health`, one chat call
+- [x] 3. pytest smoke tests + versioned fixed prompt set; assert model/revision
 - [ ] 4. Pinned image + docs (setup, teardown, cache, limitations)
 - [ ] 5. Exit gate: clean environment reproduces a valid response
 

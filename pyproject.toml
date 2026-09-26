@@ -1,0 +1,6 @@
+[tool.pytest.ini_options]
+testpaths = ["tests/unit"]
+markers = [
+    "smoke: requires a running inference endpoint (BASE_URL)",
+]
+addopts = "-ra"
