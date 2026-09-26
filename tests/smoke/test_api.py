@@ -1,7 +1,6 @@
 """Smoke tests against a live endpoint. Run: `make smoke` (BASE_URL defaults to localhost:8000)."""
 import time
-
-import pytest
+import warnings
 
 
 def chat(client, model, content, max_tokens=48):
@@ -62,22 +61,24 @@ def test_deterministic_at_temperature_zero(client, model_cfg):
     assert a == b
 
 
-def pytest_generate_tests(metafunc):
-    if "prompt" in metafunc.fixturenames:
-        import yaml
-        from pathlib import Path
-        ps = yaml.safe_load((Path(__file__).resolve().parents[2] / "app/prompts/smoke-v1.yaml").read_text())
-        metafunc.parametrize("prompt", ps["prompts"], ids=[p["id"] for p in ps["prompts"]])
+def test_prompt_set_pass_rate(client, model_cfg, prompt_set, run_record):
+    """Quality gate: aggregate pass rate, not per-prompt. Every answer is recorded."""
+    failures = []
+    for p in prompt_set["prompts"]:
+        r, latency = chat(client, model_cfg["model"]["served_name"], p["content"],
+                          max_tokens=prompt_set["max_tokens"])
+        assert r.status_code == 200, f"{p['id']}: HTTP {r.status_code}"
+        answer = r.json()["choices"][0]["message"]["content"]
+        passed = any(k.lower() in answer.lower() for k in p["expect_any"])
+        run_record["results"].append({
+            "id": p["id"], "passed": passed, "latency_s": round(latency, 3),
+            "completion_tokens": r.json()["usage"]["completion_tokens"], "answer": answer,
+        })
+        if not passed:
+            failures.append(f"{p['id']}: expected one of {p['expect_any']}, got {answer!r}")
+            warnings.warn(failures[-1])
 
-
-def test_prompt_set(client, model_cfg, prompt_set, run_record, prompt):
-    r, latency = chat(client, model_cfg["model"]["served_name"], prompt["content"],
-                      max_tokens=prompt_set["max_tokens"])
-    assert r.status_code == 200
-    answer = r.json()["choices"][0]["message"]["content"]
-    passed = any(k.lower() in answer.lower() for k in prompt["expect_any"])
-    run_record["results"].append({
-        "id": prompt["id"], "passed": passed, "latency_s": round(latency, 3),
-        "completion_tokens": r.json()["usage"]["completion_tokens"], "answer": answer,
-    })
-    assert passed, f"{prompt['id']}: expected one of {prompt['expect_any']}, got {answer!r}"
+    rate = 1 - len(failures) / len(prompt_set["prompts"])
+    run_record["pass_rate"] = rate
+    minimum = prompt_set.get("min_pass_rate", 1.0)
+    assert rate >= minimum, f"pass rate {rate:.0%} < {minimum:.0%}:\n" + "\n".join(failures)

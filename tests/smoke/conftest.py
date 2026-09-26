@@ -32,9 +32,12 @@ def client(base_url):
         yield c
 
 
+PROMPT_SET = os.environ.get("PROMPT_SET", "smoke-v2")
+
+
 @pytest.fixture(scope="session")
 def prompt_set(repo_root) -> dict:
-    return yaml.safe_load((repo_root / "app" / "prompts" / "smoke-v1.yaml").read_text())
+    return yaml.safe_load((repo_root / "app" / "prompts" / f"{PROMPT_SET}.yaml").read_text())
 
 
 @pytest.fixture(scope="session")
