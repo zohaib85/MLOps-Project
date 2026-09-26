@@ -6,7 +6,7 @@ Build window: 24 Sep – 21 Oct 2026 · ~8–10 h/week · personal learning proj
 
 | Area | Choice | Notes |
 |---|---|---|
-| Cloud / GPU | Azure AKS, minimal | Free-tier control plane; 1× small system node; 1× T4 GPU user pool scaled to 0 when idle |
+| Cloud / GPU | Azure AKS, minimal, region `eastus` | Free-tier control plane; 1× small system node; 1× T4 GPU user pool scaled to 0 when idle |
 | GPU SKU | `Standard_NC4as_T4_v3` (T4 16 GB) | Needs "Standard NCASv3_T4 Family" vCPU quota ≥ 4 — **request now** |
 | Model | Small Apache-2.0 instruct model (e.g. Qwen2.5-1.5B-Instruct) | T4 has no bf16 → `--dtype float16`; pin HF revision hash |
 | Inference | Official `vllm/vllm-openai` image, pinned by digest | We don't rebuild vLLM |
@@ -20,7 +20,9 @@ Build window: 24 Sep – 21 Oct 2026 · ~8–10 h/week · personal learning proj
 ## Steps
 
 ### Step 0 — Kickoff
-- [ ] Request Azure GPU quota (NCASv3_T4) in chosen region
+- [ ] Upgrade subscription to Pay-As-You-Go (free trial has 0 GPU quota) + budget alert
+- [ ] Register resource providers
+- [ ] Request Azure GPU quota (NCASv3_T4, 4 vCPU) in `eastus`
 - [ ] Repo skeleton, `.gitignore`, `Makefile`, README outcome statement
 - [ ] ADR stubs in `docs/adr/`
 - [ ] GitHub milestones for Weeks 1–4
