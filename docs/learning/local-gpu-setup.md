@@ -54,6 +54,7 @@ make stop
 | `CUDA out of memory` at startup | Laptop GPU shared with other apps | `make serve GPU_MEMORY_UTILIZATION=0.5`, close GPU apps |
 | `No available memory for the cache blocks` | utilization too low for weights + KV cache | raise to 0.7, or lower `max_model_len` |
 | Container exits, `nvidia-smi` fails in WSL | Linux driver installed in WSL | Remove it; rely on Windows driver |
+| `RuntimeError: operator torchvision::nms does not exist` | Broken image build (torch/torchvision CUDA mismatch) — seen in v0.30.0-cu129 | Pin a different release in `config/model.yaml`; don't patch the container |
 | Very slow model download / load | Repo or cache under `/mnt/c` | Use Linux filesystem + named volume |
 
 ## Why the `hf-cache` named volume?
