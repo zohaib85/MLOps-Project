@@ -23,8 +23,8 @@ Build window: 24 Sep – 21 Oct 2026 · ~8–10 h/week · personal learning proj
 - [ ] Upgrade subscription to Pay-As-You-Go (free trial has 0 GPU quota) + budget alert
 - [ ] Register resource providers
 - [ ] Request Azure GPU quota (NCASv3_T4, 4 vCPU) in `eastus`
-- [ ] Repo skeleton, `.gitignore`, `Makefile`, README outcome statement
-- [ ] ADR stubs in `docs/adr/`
+- [x] Repo skeleton, `.gitignore`, `Makefile`, README outcome statement
+- [x] ADR stubs in `docs/adr/`
 - [ ] GitHub milestones for Weeks 1–4
 
 ### Week 1 — Inference baseline (exit: API + smoke test)
