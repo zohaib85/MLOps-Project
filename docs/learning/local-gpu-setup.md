@@ -55,6 +55,7 @@ make stop
 | `No available memory for the cache blocks` | utilization too low for weights + KV cache | raise to 0.7, or lower `max_model_len` |
 | Container exits, `nvidia-smi` fails in WSL | Linux driver installed in WSL | Remove it; rely on Windows driver |
 | `RuntimeError: operator torchvision::nms does not exist` | Broken image build (torch/torchvision CUDA mismatch) — seen in v0.30.0-cu129 | Pin a different release in `config/model.yaml`; don't patch the container |
+| `RuntimeError: UVA is not available` | WSL2 disables pinned memory; vLLM V2 model runner needs it | `make serve` sets `VLLM_WSL2_ENABLE_PIN_MEMORY=1` on WSL automatically; fallback: `make serve EXTRA_DOCKER_ARGS="-e VLLM_USE_V2_MODEL_RUNNER=0"` |
 | Very slow model download / load | Repo or cache under `/mnt/c` | Use Linux filesystem + named volume |
 
 ## Why the `hf-cache` named volume?
