@@ -1,0 +1,45 @@
+# Model card: the single source of truth for WHAT we serve and HOW.
+# Consumed by: `make serve` (Week 1), Helm values (Week 2), smoke tests, and the benchmark report.
+# Change this file via PR only — every benchmark must be traceable to one version of it.
+
+model:
+  # Hugging Face repo id.
+  id: Qwen/Qwen2.5-0.5B-Instruct
+  # Exact HF commit SHA — never a branch name like "main" (branches move; SHAs don't).
+  # Get it with:
+  #   curl -s https://huggingface.co/api/models/Qwen/Qwen2.5-0.5B-Instruct | jq -r .sha
+  revision: REPLACE_WITH_COMMIT_SHA
+  # Name clients use in the OpenAI API "model" field; decoupled from the HF id so
+  # we can swap revisions without breaking clients.
+  served_name: qwen2.5-0.5b-instruct
+  license: apache-2.0
+  parameters: 0.5B
+  # Native context is 32k tokens; we cap it (see serving.max_model_len).
+  native_context_tokens: 32768
+
+serving:
+  # T4 (compute capability 7.5) has no bfloat16 support -> float16.
+  dtype: float16
+  # Max tokens (prompt + output) per request. Smaller cap = more KV-cache room
+  # for concurrent requests. 4k is plenty for our fixed prompt set.
+  max_model_len: 4096
+  # Fraction of GPU memory vLLM may claim for weights + KV cache.
+  gpu_memory_utilization: 0.85
+  # Upper bound on sequences batched together (continuous batching).
+  max_num_seqs: 32
+  # Sampling defaults used by tests/benchmarks for reproducibility.
+  default_temperature: 0.0
+  seed: 42
+
+hardware_profile:
+  target: azure-aks
+  vm_size: Standard_NC4as_T4_v3
+  gpu: NVIDIA T4 16GB
+  gpu_count: 1
+  local_dev: cpu   # laptop / kind — correctness only, never benchmarked
+
+runtime:
+  # Official vLLM OpenAI-compatible server image. Pinned to a digest in Week 1 step 4.
+  image: vllm/vllm-openai
+  version: TBD
+  digest: TBD

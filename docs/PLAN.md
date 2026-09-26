@@ -8,7 +8,7 @@ Build window: 24 Sep – 21 Oct 2026 · ~8–10 h/week · personal learning proj
 |---|---|---|
 | Cloud / GPU | Azure AKS, minimal, region `eastus` | Free-tier control plane; 1× small system node; 1× T4 GPU user pool scaled to 0 when idle |
 | GPU SKU | `Standard_NC4as_T4_v3` (T4 16 GB) | Needs "Standard NCASv3_T4 Family" vCPU quota ≥ 4 — **request now** |
-| Model | Small Apache-2.0 instruct model (e.g. Qwen2.5-1.5B-Instruct) | T4 has no bf16 → `--dtype float16`; pin HF revision hash |
+| Model | Small Apache-2.0 instruct model — `Qwen/Qwen2.5-0.5B-Instruct` (smallest, cheapest) | T4 has no bf16 → `--dtype float16`; pin HF revision hash |
 | Inference | Official `vllm/vllm-openai` image, pinned by digest | We don't rebuild vLLM |
 | CI | GitHub Actions | Public runs are reviewer-visible evidence |
 | Registry | GHCR | Free, OCI, no extra Azure resource |
