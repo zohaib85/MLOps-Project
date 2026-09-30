@@ -76,6 +76,7 @@ curl -s localhost:8000/v1/chat/completions -H 'Content-Type: application/json' -
 - [Architecture decision records](docs/adr/)
 - [AKS learning notes](docs/learning/aks-notes.md)
 - [Local GPU dev setup (Windows + WSL2)](docs/learning/local-gpu-setup.md)
+- [AKS Lab 01 — GPU cluster by hand](docs/learning/aks-lab-01-cluster.md)
 
 ## Scope & limitations
 
