@@ -33,7 +33,7 @@ Build window: 24 Sep – 21 Oct 2026 · ~8–10 h/week · personal learning proj
 - [x] 3. pytest smoke tests + versioned fixed prompt set; assert model/revision
 - [x] 4. Pinned image + docs (setup, teardown, cache, limitations)
 - [ ] 5. Exit gate: clean environment reproduces a valid response (laptop fresh clone + T4 on AKS)
-- [ ] AKS Lab 01: hand-built cluster + GPU pool + device plugin ([guide](learning/aks-lab-01-cluster.md))
+- [x] AKS Lab 01: hand-built cluster + GPU pool + device plugin ([guide](learning/aks-lab-01-cluster.md))
 
 ### Week 2 — Kubernetes + GitOps (exit: reproducible release)
 - [ ] 6. Helm chart `charts/vllm`: GPU request, probes, securityContext, NetworkPolicy, SA, model-cache PVC
