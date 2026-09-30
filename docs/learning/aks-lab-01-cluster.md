@@ -138,3 +138,50 @@ Deleting `$RG` also deletes the `MC_...` group automatically.
 3. Why do we need **both** a taint and a label on the GPU pool?
 4. What would break if you edited the load balancer in the `MC_` group by hand?
 5. Why is the network dataplane a create-time decision?
+
+### Answers (try first, then expand)
+
+<details><summary>1. System pool vs GPU pool scaling to 0</summary>
+
+The system pool hosts cluster-critical pods — CoreDNS, konnectivity-agent (control-plane → node tunnel for
+`logs`/`exec`), metrics-server, CNI/Cilium and CSI controllers. AKS requires ≥1 system pool with ≥1 node.
+User pools run only your workloads, so 0 nodes just means "no capacity"; with autoscaler `min-count 0`
+a pending GPU pod scales it 0 → 1. To stop *everything*, use `az aks stop`.
+</details>
+
+<details><summary>2. GPU driver vs device plugin</summary>
+
+| | Driver | Device plugin |
+|---|---|---|
+| What | Kernel module + `libcuda` on the node OS | DaemonSet speaking the kubelet device-plugin API |
+| Job | Makes the GPU usable (`nvidia-smi`, CUDA) | Advertises `nvidia.com/gpu`; hands a GPU to a container on allocation |
+| Missing → | Nothing can use the GPU | GPU works, but K8s doesn't know — GPU pods stay Pending |
+| Installed by | AKS GPU node image (+ NVIDIA container toolkit) | Us (`kubectl apply`) |
+
+Node driver version caps the CUDA version containers can use → why we pinned `cu129`.
+Alternatives: NVIDIA GPU Operator; AKS managed GPU (preview).
+</details>
+
+<details><summary>3. Taint and label</summary>
+
+Taint **repels** everything without a toleration (cost + contention). A toleration only *permits*; the
+label + `nodeSelector` **attracts**. GPU-requesting pods are steered by the resource anyway, but helpers
+that don't request a GPU (device plugin, DCGM exporter) need the selector. AKS doesn't enable
+`ExtendedResourceToleration`, so tolerations are explicit.
+</details>
+
+<details><summary>4. Editing the MC_ load balancer by hand</summary>
+
+cloud-controller-manager reconciles the LB from `Service type=LoadBalancer` objects — manual edits get
+overwritten or drift. The same LB usually provides **outbound SNAT** for nodes, so breaking it kills image
+pulls / model downloads. Upgrades can recreate resources; manual edits are unsupported. Change it via
+Service annotations or `az aks update` instead.
+</details>
+
+<details><summary>5. Dataplane is a create-time decision</summary>
+
+It defines pod IP allocation (overlay vs VNet), routing, Service load-balancing (eBPF replaces kube-proxy)
+and NetworkPolicy enforcement on every node. Without a policy engine, NetworkPolicies are accepted but
+silently not enforced. Some one-way, disruptive migrations exist (e.g. enabling Cilium on Overlay);
+pod CIDR stays fixed. In practice: choose once or rebuild.
+</details>
