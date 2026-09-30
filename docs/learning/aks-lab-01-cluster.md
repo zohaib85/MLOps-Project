@@ -132,6 +132,18 @@ Deleting `$RG` also deletes the `MC_...` group automatically.
 
 ---
 
+## Issues hit on the first run (2026-09-30) — and fixes
+| Symptom | Root cause | Fix |
+|---|---|---|
+| `AADSTS530035: Access has been blocked by security defaults` on `az login --use-device-code` | Entra **Security Defaults** block device-code flow | Interactive browser login from WSL: `sudo apt install wslu`, `export BROWSER=wslview`, `az login --tenant <id>` |
+| `The VM size of Standard_D2as_v5 is not allowed in your subscription in location 'eastus'` | **SKU restriction** (`NotAvailableForSubscription`), not quota | Pre-flight check (section 2b); used `Standard_D2s_v4` |
+| `sudo az aks install-cli` → `No such file or directory: '/usr/local/bin/kubectl'` | Dangling symlink created by Docker Desktop WSL integration | `sudo rm /usr/local/bin/kubectl`; install to `/usr/bin` |
+| `-g: expected one argument` | Commands run in a root shell — env vars and `az` login belong to the normal user | `exit` root shell; never `sudo` kubectl/az/helm |
+| `~/.kube/config: permission denied` | Kubeconfig written as root | `sudo chown -R $USER:$USER ~/.kube && chmod 600 ~/.kube/config` |
+| DaemonSet created but no pods; namespaces 236 days old | kubectl pointed at an **old local cluster** (wrong context) | `kubectl config current-context` before every apply; `az aks get-credentials` as the normal user |
+
+Lesson: most friction was identity, platform restrictions, and "which cluster am I talking to" — not Kubernetes itself.
+
 ## Check your understanding (interview prep)
 1. Why can the system pool never scale to 0, but the GPU pool can?
 2. What's the difference between the GPU **driver** and the **device plugin**? Who installs each here?
