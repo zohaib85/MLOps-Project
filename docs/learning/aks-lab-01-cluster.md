@@ -1,0 +1,127 @@
+# AKS Lab 01 — Build a GPU cluster by hand (then we codify it in Terraform)
+
+**Goal:** understand every AKS choice by making it yourself with `az`, verify a pod can use the T4,
+then tear down. Week 2 recreates the same cluster with Terraform.
+**Time:** ~45 min (mostly waiting). **Cost:** roughly $0.60–0.70/hour while the GPU node runs —
+check current prices on the Azure pricing page. Always finish with the teardown section.
+
+Run everything in **WSL Ubuntu**.
+
+---
+
+## 0. Tools (one time)
+```bash
+curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash   # Azure CLI
+sudo az aks install-cli                                   # kubectl + kubelogin
+az version -o table && kubectl version --client
+
+az login --use-device-code          # opens a code you enter in your Windows browser
+az account show -o table            # confirm the Pay-As-You-Go subscription is selected
+```
+
+## 1. Names in one place
+```bash
+export RG=rg-llm-lab LOC=eastus AKS=aks-llm-lab
+export TAGS="project=llm-platform env=lab owner=zohaib"
+```
+Tags let you filter cost by project in Cost Management — do it from the first resource.
+
+## 2. Resource group
+```bash
+az group create -n $RG -l $LOC --tags $TAGS -o table
+```
+
+## 3. Create the cluster (system pool only) — ~5–8 min
+```bash
+az aks create -g $RG -n $AKS -l $LOC --tags $TAGS \
+  --tier free \
+  --nodepool-name system --node-count 1 --node-vm-size Standard_D2as_v5 \
+  --network-plugin azure --network-plugin-mode overlay --network-dataplane cilium \
+  --enable-oidc-issuer --enable-workload-identity \
+  --generate-ssh-keys -o table
+```
+| Flag | What it decides | Why this choice |
+|---|---|---|
+| `--tier free` | Control-plane SLA | Free = no SLA, $0. Fine for a lab; Standard adds the uptime SLA for production |
+| `--nodepool-name system --node-count 1` | The **system pool** (CoreDNS, metrics-server, konnectivity) | Must always exist; 1 small node for a lab |
+| `--node-vm-size Standard_D2as_v5` | 2 vCPU / 8 GB AMD VM | Cheap but enough RAM for Prometheus later. If quota fails, try `Standard_D2s_v5` or `Standard_B2ms` |
+| `--network-plugin azure --network-plugin-mode overlay` | **Azure CNI Overlay**: pods get IPs from a private overlay, not your VNet | Doesn't burn VNet IPs; Microsoft's recommended default |
+| `--network-dataplane cilium` | eBPF dataplane **and** the NetworkPolicy engine | We need NetworkPolicy in Week 2. Chosen at create time — hard to change later |
+| `--enable-oidc-issuer --enable-workload-identity` | Pods can get Entra ID tokens without secrets | Needed later for secrets/Key Vault; free to enable now |
+
+## 4. Connect and explore — this is the "AKS vs vanilla K8s" lesson
+```bash
+az aks get-credentials -g $RG -n $AKS --overwrite-existing
+kubectl get nodes -o wide
+kubectl get pods -n kube-system
+kubectl get node -o jsonpath='{.items[0].metadata.labels}' | tr ',' '\n' | grep -E 'agentpool|mode|kubernetes.azure.com'
+```
+Now find where your VM actually lives:
+```bash
+NODE_RG=$(az aks show -g $RG -n $AKS --query nodeResourceGroup -o tsv); echo $NODE_RG
+az resource list -g $NODE_RG -o table
+```
+You should see a **VM Scale Set**, a **load balancer**, a **public IP**, a **VNet**, NSG, managed identity.
+👉 That `MC_...` group is owned by AKS. Look, don't touch — AKS reconciles it.
+
+Things to notice:
+- No control-plane nodes in `kubectl get nodes` — Azure runs them.
+- `kube-system` has Azure-specific pods: `cilium-*`, `azure-cns`, `konnectivity-agent`, CSI drivers (`csi-azuredisk-node`, `csi-azurefile-node`).
+- Node label `kubernetes.azure.com/mode=system`.
+
+## 5. Add the GPU pool — ~5–10 min
+```bash
+az aks nodepool add -g $RG --cluster-name $AKS -n gpu --tags $TAGS \
+  --mode User --node-count 1 \
+  --node-vm-size Standard_NC4as_T4_v3 \
+  --node-taints sku=gpu:NoSchedule \
+  --labels workload=gpu -o table
+```
+| Flag | Why |
+|---|---|
+| `--mode User` | Only user pools can scale to 0 — the core of our cost control |
+| `--node-taints sku=gpu:NoSchedule` | Nothing lands on the $0.5/h node unless it explicitly tolerates it |
+| `--labels workload=gpu` | Lets GPU workloads *select* this pool (taint repels, label attracts — you need both) |
+
+AKS installs the **NVIDIA driver** on GPU node images automatically.
+
+## 6. Install the NVIDIA device plugin
+The driver makes the GPU usable by the OS. The **device plugin** tells Kubernetes it exists
+(`nvidia.com/gpu`) so the scheduler can hand it to pods.
+```bash
+kubectl apply -f deploy/lab/nvidia-device-plugin.yaml
+kubectl -n gpu-resources get pods -o wide          # 1 pod, on the GPU node
+kubectl get nodes -l workload=gpu -o custom-columns=NAME:.metadata.name,GPU:.status.allocatable.'nvidia\.com/gpu'
+```
+✅ `GPU` column shows `1`.
+
+## 7. Prove a pod can use the GPU
+```bash
+kubectl apply -f deploy/lab/gpu-smoke-pod.yaml
+kubectl get pod gpu-smoke -w        # Pending → ContainerCreating → Completed, then Ctrl+C
+kubectl logs gpu-smoke              # nvidia-smi table showing "Tesla T4"
+kubectl delete pod gpu-smoke
+```
+Note the **driver version** in the output — it decides which CUDA images work (remember why we chose `cu129`).
+
+## 8. Pause or tear down (don't skip)
+```bash
+# Pause GPU only (keeps cluster; ~$0.09/h for the system node):
+az aks nodepool scale -g $RG --cluster-name $AKS -n gpu --node-count 0
+
+# Pause everything (deallocates all nodes; config kept):
+az aks stop -g $RG -n $AKS         # resume: az aks start -g $RG -n $AKS
+
+# Delete everything (the lab is disposable — Terraform rebuilds it in Week 2):
+az group delete -n $RG --yes --no-wait
+```
+Deleting `$RG` also deletes the `MC_...` group automatically.
+
+---
+
+## Check your understanding (interview prep)
+1. Why can the system pool never scale to 0, but the GPU pool can?
+2. What's the difference between the GPU **driver** and the **device plugin**? Who installs each here?
+3. Why do we need **both** a taint and a label on the GPU pool?
+4. What would break if you edited the load balancer in the `MC_` group by hand?
+5. Why is the network dataplane a create-time decision?

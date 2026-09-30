@@ -7,7 +7,7 @@ Build window: 24 Sep – 21 Oct 2026 · ~8–10 h/week · personal learning proj
 | Area | Choice | Notes |
 |---|---|---|
 | Cloud / GPU | Azure AKS, minimal, region `eastus` | Free-tier control plane; 1× small system node; 1× T4 GPU user pool scaled to 0 when idle |
-| GPU SKU | `Standard_NC4as_T4_v3` (T4 16 GB) | Needs "Standard NCASv3_T4 Family" vCPU quota ≥ 4 — **request now** |
+| GPU SKU | `Standard_NC4as_T4_v3` (T4 16 GB) | "Standard NCASv3_T4 Family" quota 4 vCPU — approved |
 | Model | Small Apache-2.0 instruct model — `Qwen/Qwen2.5-0.5B-Instruct` (smallest, cheapest) | T4 has no bf16 → `--dtype float16`; pin HF revision hash |
 | Inference | Official `vllm/vllm-openai` image, pinned by digest | We don't rebuild vLLM |
 | CI | GitHub Actions | Public runs are reviewer-visible evidence |
@@ -20,9 +20,9 @@ Build window: 24 Sep – 21 Oct 2026 · ~8–10 h/week · personal learning proj
 ## Steps
 
 ### Step 0 — Kickoff
-- [ ] Upgrade subscription to Pay-As-You-Go (free trial has 0 GPU quota) + budget alert
-- [ ] Register resource providers
-- [ ] Request Azure GPU quota (NCASv3_T4, 4 vCPU) in `eastus`
+- [x] Upgrade subscription to Pay-As-You-Go (free trial has 0 GPU quota) + budget alert
+- [x] Register resource providers
+- [x] Request Azure GPU quota (NCASv3_T4, 4 vCPU) in `eastus`
 - [x] Repo skeleton, `.gitignore`, `Makefile`, README outcome statement
 - [x] ADR stubs in `docs/adr/`
 - [ ] GitHub milestones for Weeks 1–4
@@ -32,7 +32,8 @@ Build window: 24 Sep – 21 Oct 2026 · ~8–10 h/week · personal learning proj
 - [x] 2. `make serve` locally; verify `/v1/models`, `/health`, one chat call
 - [x] 3. pytest smoke tests + versioned fixed prompt set; assert model/revision
 - [x] 4. Pinned image + docs (setup, teardown, cache, limitations)
-- [ ] 5. Exit gate: clean environment reproduces a valid response
+- [ ] 5. Exit gate: clean environment reproduces a valid response (laptop fresh clone + T4 on AKS)
+- [ ] AKS Lab 01: hand-built cluster + GPU pool + device plugin ([guide](learning/aks-lab-01-cluster.md))
 
 ### Week 2 — Kubernetes + GitOps (exit: reproducible release)
 - [ ] 6. Helm chart `charts/vllm`: GPU request, probes, securityContext, NetworkPolicy, SA, model-cache PVC
