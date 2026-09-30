@@ -31,11 +31,24 @@ Tags let you filter cost by project in Cost Management — do it from the first 
 az group create -n $RG -l $LOC --tags $TAGS -o table
 ```
 
+## 2b. Pre-flight: are the VM sizes allowed, and is there quota?
+New subscriptions often can't use every size in busy regions (`NotAvailableForSubscription`) —
+that's a **SKU restriction**, separate from quota. Check both before waiting on a create:
+```bash
+for s in Standard_D2s_v4 Standard_NC4as_T4_v3; do
+  az vm list-skus -l $LOC --size $s --all -o tsv \
+    --query "[?name=='$s'].[name, join(',', restrictions[].reasonCode)]"
+done                                   # second column must be empty
+az vm list-usage -l $LOC -o table | grep -iE "DSv4 Family|NCASv3_T4|Total Regional vCPUs"
+```
+Seen on this project (eastus, new PAYG subscription, Sep 2026): most v5/v6 D- and B-series were
+restricted; v4, v7 and ARM (`p`) sizes were allowed.
+
 ## 3. Create the cluster (system pool only) — ~5–8 min
 ```bash
 az aks create -g $RG -n $AKS -l $LOC --tags $TAGS \
   --tier free \
-  --nodepool-name system --node-count 1 --node-vm-size Standard_D2as_v5 \
+  --nodepool-name system --node-count 1 --node-vm-size Standard_D2s_v4 \
   --network-plugin azure --network-plugin-mode overlay --network-dataplane cilium \
   --enable-oidc-issuer --enable-workload-identity \
   --generate-ssh-keys -o table
@@ -44,7 +57,7 @@ az aks create -g $RG -n $AKS -l $LOC --tags $TAGS \
 |---|---|---|
 | `--tier free` | Control-plane SLA | Free = no SLA, $0. Fine for a lab; Standard adds the uptime SLA for production |
 | `--nodepool-name system --node-count 1` | The **system pool** (CoreDNS, metrics-server, konnectivity) | Must always exist; 1 small node for a lab |
-| `--node-vm-size Standard_D2as_v5` | 2 vCPU / 8 GB AMD VM | Cheap but enough RAM for Prometheus later. If quota fails, try `Standard_D2s_v5` or `Standard_B2ms` |
+| `--node-vm-size Standard_D2s_v4` | 2 vCPU / 8 GB Intel VM | Enough RAM for Prometheus later. Chosen because newer v5/v6 sizes are **restricted for new subscriptions in eastus** (see 2b); fallback `Standard_D2as_v7` |
 | `--network-plugin azure --network-plugin-mode overlay` | **Azure CNI Overlay**: pods get IPs from a private overlay, not your VNet | Doesn't burn VNet IPs; Microsoft's recommended default |
 | `--network-dataplane cilium` | eBPF dataplane **and** the NetworkPolicy engine | We need NetworkPolicy in Week 2. Chosen at create time — hard to change later |
 | `--enable-oidc-issuer --enable-workload-identity` | Pods can get Entra ID tokens without secrets | Needed later for secrets/Key Vault; free to enable now |
