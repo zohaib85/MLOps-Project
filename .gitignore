@@ -1,0 +1,52 @@
+# --- Secrets & credentials (never commit) ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+kubeconfig*
+*.kubeconfig
+
+# --- Model weights & caches (never commit; pulled at runtime) ---
+models/
+.cache/
+hf_cache/
+*.safetensors
+*.bin
+*.gguf
+*.pt
+*.pth
+
+# --- Terraform ---
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+*.tfvars
+!*.tfvars.example
+.terraform.lock.hcl.bak
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+*.egg-info/
+
+# --- Helm ---
+charts/*/charts/
+charts/*/*.tgz
+
+# --- Local benchmark/raw outputs (curated results live in docs/) ---
+results/raw/
+
+# --- Editors / OS ---
+.idea/
+.vscode/
+.DS_Store

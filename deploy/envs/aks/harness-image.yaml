@@ -1,0 +1,7 @@
+# CI-OWNED — written by .github/workflows/ci.yml (scripts/bump_harness_image.py) on main.
+# Harness image used by `helm test` on AKS. Humans don't edit this file; Git history is the audit log.
+mock:
+  image:
+    repository: ghcr.io/zohaib85/llm-platform-harness
+    tag: dev
+    digest: ""

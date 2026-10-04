@@ -1,0 +1,171 @@
+# CI: every PR and push to main.
+#   test      — unit tests, ruff, helm lint, generated-values drift
+#   manifests — render each env → kubeconform (schemas) + conftest (policy) + Trivy config scan
+#   secrets   — gitleaks over full history
+#   image     — build harness image, Trivy scan; on main: push to GHCR by digest
+#   bump      — on main: commit the new digest to deploy/envs/aks/harness-image.yaml (GitOps input)
+# CI never receives cluster credentials — Argo CD (step 8) pulls from Git.
+# Third-party actions are pinned to commit SHAs (tags can be moved; SHAs can't).
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  HELM_VERSION: v3.19.0
+  KUBECONFORM_VERSION: v0.8.0
+  CONFTEST_VERSION: 0.60.0
+  IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/llm-platform-harness
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+          cache: pip
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        with:
+          version: ${{ env.HELM_VERSION }}
+      - run: pip install -r requirements-dev.txt
+      - run: make lint
+      - run: make test
+
+  manifests:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        with:
+          version: ${{ env.HELM_VERSION }}
+      - name: Install kubeconform + conftest
+        run: |
+          mkdir -p "$HOME/bin" && echo "$HOME/bin" >> "$GITHUB_PATH"
+          curl -fsSL "https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz" \
+            | tar -xz -C "$HOME/bin" kubeconform
+          curl -fsSL "https://github.com/open-policy-agent/conftest/releases/download/v${CONFTEST_VERSION}/conftest_${CONFTEST_VERSION}_Linux_x86_64.tar.gz" \
+            | tar -xz -C "$HOME/bin" conftest
+      - run: make policy-test
+      - run: make validate
+      - name: Render manifests for scanning
+        run: |
+          mkdir -p "$RUNNER_TEMP/scan"
+          for e in kind aks; do
+            extra=""; [ -f "deploy/envs/$e/harness-image.yaml" ] && extra="-f deploy/envs/$e/harness-image.yaml"
+            helm template llm charts/vllm -n llm -f charts/vllm/values-model.yaml \
+              -f "deploy/envs/$e/values.yaml" $extra > "$RUNNER_TEMP/scan/$e.yaml"
+          done
+          cp app/Dockerfile "$RUNNER_TEMP/scan/Dockerfile"
+      - name: Trivy config scan (rendered manifests + Dockerfile)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: config
+          scan-ref: ${{ runner.temp }}/scan
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+
+  secrets:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # scan the whole history, not just the latest commit
+      - uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  image:
+    needs: [test, manifests]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      digest: ${{ steps.push.outputs.digest }}
+      tag: sha-${{ github.sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Build (load locally for scanning)
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: app/Dockerfile
+          load: true
+          tags: ${{ env.IMAGE_NAME }}:sha-${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Smoke-test the image (mock server + smoke suite inside the image)
+        run: |
+          docker run -d --name mock -p 8000:8000 \
+            -e MOCK_SERVED_NAME=qwen2.5-0.5b-instruct -e MOCK_ROOT=Qwen/Qwen2.5-0.5B-Instruct \
+            "${IMAGE_NAME}:sha-${GITHUB_SHA}"
+          for i in $(seq 1 20); do curl -sf localhost:8000/health && break; sleep 1; done
+          docker run --rm --network host -e BASE_URL=http://localhost:8000 \
+            "${IMAGE_NAME}:sha-${GITHUB_SHA}" pytest tests/smoke -q -k "not pass_rate" -p no:cacheprovider
+      - name: Trivy image scan
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ env.IMAGE_NAME }}:sha-${{ github.sha }}
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
+      - name: Log in to GHCR
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Push by digest
+        id: push
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: app/Dockerfile
+          push: true
+          tags: ${{ env.IMAGE_NAME }}:sha-${{ github.sha }}
+          cache-from: type=gha
+          provenance: mode=max
+          sbom: true
+      - name: Summary
+        if: steps.push.outputs.digest != ''
+        run: echo "Pushed \`${IMAGE_NAME}@${{ steps.push.outputs.digest }}\`" >> "$GITHUB_STEP_SUMMARY"
+
+  bump:
+    needs: image
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.image.outputs.digest != ''
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Write CI-owned image file
+        run: |
+          python scripts/bump_harness_image.py --repository "$IMAGE_NAME" \
+            --tag "${{ needs.image.outputs.tag }}" --digest "${{ needs.image.outputs.digest }}"
+      - name: Commit (GITHUB_TOKEN pushes don't trigger another workflow run)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add deploy/envs/aks/harness-image.yaml
+          git diff --cached --quiet && { echo "no change"; exit 0; }
+          git commit -m "chore(deploy): harness image ${{ needs.image.outputs.digest }}" \
+                     -m "Built from ${GITHUB_SHA} by run ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          git push

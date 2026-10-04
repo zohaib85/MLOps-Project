@@ -1,0 +1,48 @@
+{{- if .Values.networkPolicy.enabled }}
+# Default-deny for the inference pod, then allow only what it needs.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "vllm.fullname" . }}
+  labels:
+    {{- include "vllm.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "vllm.selectorLabels" . | nindent 6 }}
+  policyTypes: ["Ingress", "Egress"]
+  ingress:
+    - from:
+        {{- if .Values.networkPolicy.ingressFrom }}
+        {{- toYaml .Values.networkPolicy.ingressFrom | nindent 8 }}
+        {{- else }}
+        - podSelector: {}          # any pod in this namespace
+        {{- end }}
+      ports:
+        - port: http
+          protocol: TCP
+  egress:
+    # DNS
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - { port: 53, protocol: UDP }
+        - { port: 53, protocol: TCP }
+    {{- if .Values.networkPolicy.egress.allowInternetHTTPS }}
+    # HTTPS to the internet (Hugging Face) — never to the instance metadata service.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            {{- if .Values.networkPolicy.egress.blockMetadataEndpoint }}
+            except:
+              - 169.254.169.254/32
+            {{- end }}
+      ports:
+        - { port: 443, protocol: TCP }
+    {{- end }}
+{{- end }}

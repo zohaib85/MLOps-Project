@@ -1,0 +1,116 @@
+# Defaults are secure and GPU-oriented. Environment overlays live in deploy/envs/<env>/values.yaml.
+# Model identity + vLLM args come from values-model.yaml (generated from config/model.yaml).
+
+# vllm = real inference (GPU). mock = lightweight OpenAI-compatible stub for clusters
+# without a GPU (kind/CI) — exercises the same Service, probes, policies and storage.
+engine: vllm
+
+nameOverride: ""
+fullnameOverride: ""
+
+# Filled by values-model.yaml — do not set by hand.
+model:
+  id: ""
+  revision: ""
+  servedName: ""
+
+vllm:
+  image:
+    repository: ""
+    tag: ""
+    digest: ""        # required for engine=vllm: images are pinned by digest
+    pullPolicy: IfNotPresent
+  args: []
+  extraEnv: []
+
+mock:
+  image:
+    repository: ghcr.io/zohaib85/llm-platform-harness
+    tag: dev
+    digest: ""
+    pullPolicy: IfNotPresent
+  # Simulates model loading so the startup probe is exercised.
+  startupDelaySeconds: 20
+
+gpu:
+  enabled: true
+  count: 1
+
+resources: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# Optional bearer-token auth: vLLM reads VLLM_API_KEY. Point at an existing Secret.
+auth:
+  existingSecret: ""
+  secretKey: api-key
+
+service:
+  type: ClusterIP
+  port: 8000
+
+# Model download + load can take minutes: the startup probe owns that window so the
+# liveness probe can stay strict once the server is up.
+probes:
+  startup:
+    periodSeconds: 10
+    failureThreshold: 60      # up to 10 minutes to become ready
+    timeoutSeconds: 3
+  readiness:
+    periodSeconds: 5
+    failureThreshold: 3
+    timeoutSeconds: 3
+  liveness:
+    periodSeconds: 15
+    failureThreshold: 3
+    timeoutSeconds: 5
+
+# Persistent Hugging Face cache: restarts reuse downloaded weights instead of re-fetching.
+modelCache:
+  enabled: true
+  size: 10Gi
+  storageClassName: ""        # "" = cluster default
+  existingClaim: ""
+  keepOnUninstall: false
+
+# vLLM uses shared memory for inter-process communication (docker --ipc=host locally).
+shm:
+  sizeLimit: 2Gi
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  runAsGroup: 10001
+  fsGroup: 10001              # makes the model-cache volume writable for the non-root user
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+
+serviceAccount:
+  create: true
+  name: ""
+  # The server never talks to the Kubernetes API — don't mount a token it doesn't need.
+  automount: false
+
+networkPolicy:
+  enabled: true
+  # Who may call the API. Empty = any pod in the same namespace.
+  ingressFrom: []
+  egress:
+    # Needed to download weights from Hugging Face on first start.
+    allowInternetHTTPS: true
+    # Block the cloud instance metadata endpoint (credential theft path).
+    blockMetadataEndpoint: true
+
+podAnnotations: {}
+podLabels: {}
+
+# `helm test` image: the harness image (python + urllib), runs a /health check.
+test:
+  enabled: true

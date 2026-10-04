@@ -1,0 +1,15 @@
+# Local kind cluster: no GPU → mock engine. Validates packaging, probes, policy, storage.
+engine: mock
+gpu:
+  enabled: false
+mock:
+  image:
+    repository: llm-platform-harness
+    tag: dev
+    pullPolicy: Never          # loaded with `kind load docker-image`
+  startupDelaySeconds: 20
+modelCache:
+  size: 1Gi
+resources:
+  requests: { cpu: 50m, memory: 64Mi }
+  limits: { memory: 256Mi }

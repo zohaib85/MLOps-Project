@@ -1,0 +1,24 @@
+# AppProject = guardrails for what Argo CD may deploy, from where, to where.
+# Even if someone edits an Application, it can only pull from this repo, only into the
+# `llm` namespace, and only create the resource kinds listed here.
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: llm-platform
+  namespace: argocd
+spec:
+  description: LLM inference platform
+  sourceRepos:
+    - https://github.com/zohaib85/MLOps-Project.git
+  destinations:
+    - server: https://kubernetes.default.svc   # the cluster Argo CD runs in
+      namespace: llm
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace
+  namespaceResourceWhitelist:
+    - { group: "", kind: ServiceAccount }
+    - { group: "", kind: Service }
+    - { group: "", kind: PersistentVolumeClaim }
+    - { group: apps, kind: Deployment }
+    - { group: networking.k8s.io, kind: NetworkPolicy }

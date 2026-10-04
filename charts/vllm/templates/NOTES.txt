@@ -1,0 +1,9 @@
+{{ include "vllm.fullname" . }} ({{ .Values.engine }}) serving {{ .Values.model.servedName }}
+  model:    {{ .Values.model.id }} @ {{ .Values.model.revision }}
+
+Watch startup (model download + load can take minutes):
+  kubectl -n {{ .Release.Namespace }} get pods -l app.kubernetes.io/instance={{ .Release.Name }} -w
+
+Test from your machine:
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "vllm.fullname" . }} 8000:{{ .Values.service.port }}
+  curl -s localhost:8000/v1/models

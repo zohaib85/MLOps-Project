@@ -1,0 +1,50 @@
+# Model card: the single source of truth for WHAT we serve and HOW.
+# Consumed by: `make serve` (Week 1), Helm values (Week 2), smoke tests, and the benchmark report.
+# Change this file via PR only — every benchmark must be traceable to one version of it.
+
+model:
+  # Hugging Face repo id.
+  id: Qwen/Qwen2.5-0.5B-Instruct
+  # Exact HF commit SHA — never a branch name like "main" (branches move; SHAs don't).
+  # Get it with:
+  #   curl -s https://huggingface.co/api/models/Qwen/Qwen2.5-0.5B-Instruct | jq -r .sha
+  revision: 7ae557604adf67be50417f59c2c2f167def9a775
+  # Name clients use in the OpenAI API "model" field; decoupled from the HF id so
+  # we can swap revisions without breaking clients.
+  served_name: qwen2.5-0.5b-instruct
+  license: apache-2.0
+  parameters: 0.5B
+  # Native context is 32k tokens; we cap it (see serving.max_model_len).
+  native_context_tokens: 32768
+
+serving:
+  # T4 (compute capability 7.5) has no bfloat16 support -> float16.
+  dtype: float16
+  # Max tokens (prompt + output) per request. Smaller cap = more KV-cache room
+  # for concurrent requests. 4k is plenty for our fixed prompt set.
+  max_model_len: 4096
+  # Fraction of GPU memory vLLM may claim for weights + KV cache.
+  gpu_memory_utilization: 0.85
+  # Upper bound on sequences batched together (continuous batching).
+  max_num_seqs: 32
+  # Sampling defaults used by tests/benchmarks for reproducibility.
+  default_temperature: 0.0
+  seed: 42
+
+hardware_profile:
+  target: azure-aks
+  vm_size: Standard_NC4as_T4_v3
+  gpu: NVIDIA T4 16GB
+  gpu_count: 1
+  # Laptop: RTX A2000 8GB via WSL2 + Docker. Dev/correctness only — never used for published benchmarks.
+  local_dev: rtx-a2000-8gb
+
+runtime:
+  # Official vLLM OpenAI-compatible server image, pinned by digest (tags can be re-pushed; digests can't).
+  # cu129 variant chosen deliberately: CUDA 12.x images run on any NVIDIA driver >= 525 (minor-version
+  # compatibility), whereas the default CUDA 13 build needs driver >= 580 — AKS GPU node images may lag.
+  # v0.30.0-cu129 rejected: ships a cu130 torch with cu129 torchvision and crashes at import
+  # ("operator torchvision::nms does not exist") — https://github.com/vllm-project/vllm/issues/56829
+  image: docker.io/vllm/vllm-openai
+  version: v0.29.0-cu129
+  digest: sha256:7ef5a35d1ef8ce2cf9d671dd91eec6e367c5849262e0362b4d3d4a26be0d87d2

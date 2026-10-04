@@ -1,0 +1,40 @@
+{{- if .Values.test.enabled }}
+# `helm test <release>`: an in-namespace client can reach /health and /v1/models.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ include "vllm.fullname" . }}-test
+  # Deliberately NOT the chart's selector labels: otherwise the Service would route traffic to
+  # this pod and the server's NetworkPolicy (egress: DNS + 443 only) would block its call.
+  labels:
+    app.kubernetes.io/name: {{ include "vllm.name" . }}-test
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: test
+  annotations:
+    helm.sh/hook: test
+    # Keep the pod after success so `helm test --logs` can read it; replaced on the next run.
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  restartPolicy: Never
+  automountServiceAccountToken: false
+  securityContext:
+    {{- toYaml .Values.podSecurityContext | nindent 4 }}
+  containers:
+    - name: check
+      image: {{ include "vllm.imageRef" .Values.mock.image | quote }}
+      imagePullPolicy: {{ .Values.mock.image.pullPolicy }}
+      command: ["python", "-c"]
+      args:
+        - |
+          import json, urllib.request
+          base = "http://{{ include "vllm.fullname" . }}:{{ .Values.service.port }}"
+          assert urllib.request.urlopen(base + "/health", timeout=10).status == 200
+          ids = [m["id"] for m in json.load(urllib.request.urlopen(base + "/v1/models", timeout=10))["data"]]
+          assert {{ .Values.model.servedName | quote }} in ids, ids
+          print("ok:", ids)
+      securityContext:
+        {{- toYaml .Values.securityContext | nindent 8 }}
+      resources:
+        requests: { cpu: 10m, memory: 32Mi }
+        limits: { memory: 128Mi }
+{{- end }}

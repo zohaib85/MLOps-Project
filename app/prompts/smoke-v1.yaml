@@ -1,0 +1,22 @@
+# Fixed, synthetic regression prompt set. NEVER edit in place — copy to smoke-v2.yaml and
+# bump `version`, so every recorded result stays traceable to the exact prompts used.
+# Expectations are deliberately lenient (keyword match): a 0.5B model is judged on
+# "does the serving path return sane output", not on answer quality.
+version: smoke-v1
+max_tokens: 48
+prompts:
+  - id: capital
+    content: "What is the capital of France? Answer with one word."
+    expect_any: ["paris"]
+  - id: arithmetic
+    content: "What is 12 + 30? Answer with just the number."
+    expect_any: ["42"]
+  - id: domain
+    content: "Which open-source system orchestrates containers and was originally designed at Google? One word."
+    expect_any: ["kubernetes", "k8s"]
+  - id: translation
+    content: "Translate the English word 'hello' into Spanish. One word."
+    expect_any: ["hola"]
+  - id: format
+    content: 'Reply with only this JSON and nothing else: {"status": "ok"}'
+    expect_any: ['"status"']

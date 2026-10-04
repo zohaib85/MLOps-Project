@@ -1,0 +1,18 @@
+[tool.pytest.ini_options]
+testpaths = ["tests/unit"]
+markers = [
+    "smoke: requires a running inference endpoint (BASE_URL)",
+]
+addopts = "-ra"
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "S"]
+ignore = ["S101"]  # assert is how pytest works
+
+[tool.ruff.lint.per-file-ignores]
+"app/mock_openai.py" = ["S104"]          # binding 0.0.0.0 inside a container is intended
+"tests/**" = ["S603", "S607"]             # tests invoke helm via subprocess

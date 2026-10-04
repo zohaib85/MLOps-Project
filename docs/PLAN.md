@@ -6,36 +6,39 @@ Build window: 24 Sep – 21 Oct 2026 · ~8–10 h/week · personal learning proj
 
 | Area | Choice | Notes |
 |---|---|---|
-| Cloud / GPU | Azure AKS, minimal | Free-tier control plane; 1× small system node; 1× T4 GPU user pool scaled to 0 when idle |
-| GPU SKU | `Standard_NC4as_T4_v3` (T4 16 GB) | Needs "Standard NCASv3_T4 Family" vCPU quota ≥ 4 — **request now** |
-| Model | Small Apache-2.0 instruct model (e.g. Qwen2.5-1.5B-Instruct) | T4 has no bf16 → `--dtype float16`; pin HF revision hash |
+| Cloud / GPU | Azure AKS, minimal, region `eastus` | Free-tier control plane; 1× small system node; 1× T4 GPU user pool scaled to 0 when idle |
+| GPU SKU | `Standard_NC4as_T4_v3` (T4 16 GB) | "Standard NCASv3_T4 Family" quota 4 vCPU — approved |
+| Model | Small Apache-2.0 instruct model — `Qwen/Qwen2.5-0.5B-Instruct` (smallest, cheapest) | T4 has no bf16 → `--dtype float16`; pin HF revision hash |
 | Inference | Official `vllm/vllm-openai` image, pinned by digest | We don't rebuild vLLM |
 | CI | GitHub Actions | Public runs are reviewer-visible evidence |
 | Registry | GHCR | Free, OCI, no extra Azure resource |
 | Our image | Eval/load/smoke harness (`app/`) | Built, scanned, published by digest in CI |
 | GitOps | Argo CD, same repo, `deploy/` path | CI commits digest bump; CI never holds cluster creds |
 | Gateway | vLLM `--api-key` + ingress-nginx rate limits | Minimal; Envoy Gateway deferred |
-| Local dev | Docker + kind, CPU / tiny model or mock | GPU only for integration + evidence runs |
+| Local dev | WSL2 + Docker on RTX A2000 8GB; kind for cluster work | Laptop GPU for dev; T4 on AKS for evidence runs |
 
 ## Steps
 
 ### Step 0 — Kickoff
-- [ ] Request Azure GPU quota (NCASv3_T4) in chosen region
-- [ ] Repo skeleton, `.gitignore`, `Makefile`, README outcome statement
-- [ ] ADR stubs in `docs/adr/`
+- [x] Upgrade subscription to Pay-As-You-Go (free trial has 0 GPU quota) + budget alert
+- [x] Register resource providers
+- [x] Request Azure GPU quota (NCASv3_T4, 4 vCPU) in `eastus`
+- [x] Repo skeleton, `.gitignore`, `Makefile`, README outcome statement
+- [x] ADR stubs in `docs/adr/`
 - [ ] GitHub milestones for Weeks 1–4
 
 ### Week 1 — Inference baseline (exit: API + smoke test)
-- [ ] 1. `config/model.yaml`: model, revision, licence, context, serving params
-- [ ] 2. `make serve` locally; verify `/v1/models`, `/health`, one chat call
-- [ ] 3. pytest smoke tests + versioned fixed prompt set; assert model/revision
-- [ ] 4. Pinned image + docs (setup, teardown, cache, limitations)
-- [ ] 5. Exit gate: clean environment reproduces a valid response
+- [x] 1. `config/model.yaml`: model, revision, licence, context, serving params
+- [x] 2. `make serve` locally; verify `/v1/models`, `/health`, one chat call
+- [x] 3. pytest smoke tests + versioned fixed prompt set; assert model/revision
+- [x] 4. Pinned image + docs (setup, teardown, cache, limitations)
+- [ ] 5. Exit gate: clean environment reproduces a valid response (laptop fresh clone + T4 on AKS)
+- [x] AKS Lab 01: hand-built cluster + GPU pool + device plugin ([guide](learning/aks-lab-01-cluster.md))
 
 ### Week 2 — Kubernetes + GitOps (exit: reproducible release)
-- [ ] 6. Helm chart `charts/vllm`: GPU request, probes, securityContext, NetworkPolicy, SA, model-cache PVC
-- [ ] 7. CI: pytest, helm lint/template, kubeconform, policy check, Trivy, gitleaks, publish by digest, digest bump
-- [ ] 8. Argo CD Application + AppProject (kind first, then AKS)
+- [x] 6. Helm chart `charts/vllm`: GPU request, probes, securityContext, NetworkPolicy, SA, model-cache PVC ([guide](learning/step6-helm-chart.md))
+- [x] 7. CI: pytest, helm lint/template, kubeconform, policy check, Trivy, gitleaks, publish by digest, digest bump ([guide](learning/step7-ci.md)) — green on PR #2
+- [ ] 8. Argo CD Application + AppProject (kind first, then AKS) ([guide](learning/step8-argocd.md)) — manifests + tests done; kind run pending
 - [ ] 9. Terraform: AKS + GPU pool + budget alert; `make down` teardown
 - [ ] 10. Exit gate: Git change → traceable release; previous version restorable
 
