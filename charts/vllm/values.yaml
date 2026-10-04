@@ -80,9 +80,9 @@ shm:
 
 podSecurityContext:
   runAsNonRoot: true
-  runAsUser: 1000
-  runAsGroup: 1000
-  fsGroup: 1000               # makes the model-cache volume writable for the non-root user
+  runAsUser: 10001
+  runAsGroup: 10001
+  fsGroup: 10001              # makes the model-cache volume writable for the non-root user
   seccompProfile:
     type: RuntimeDefault
 

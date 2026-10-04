@@ -1,10 +1,10 @@
 """Unit tests: config/model.yaml is valid and renders the vLLM command we expect."""
+
 import re
 
 import pytest
-import yaml
-
 import vllm_args
+import yaml
 
 
 def test_revision_is_pinned_sha(model_cfg):
@@ -21,7 +21,7 @@ def test_server_args_come_from_config(model_cfg, monkeypatch):
     args = vllm_args.server_args(model_cfg)
     m, s = model_cfg["model"], model_cfg["serving"]
     assert args[0] == m["id"], "model must be the positional first argument"
-    flags = dict(zip(args[1::2], args[2::2]))
+    flags = dict(zip(args[1::2], args[2::2], strict=True))
     assert flags["--revision"] == m["revision"]
     assert flags["--tokenizer-revision"] == m["revision"]
     assert flags["--served-model-name"] == m["served_name"]
@@ -31,7 +31,7 @@ def test_server_args_come_from_config(model_cfg, monkeypatch):
 
 
 def test_gpu_memory_override(model_cfg):
-    flags = dict(zip(*[iter(vllm_args.server_args(model_cfg, "0.5")[1:])] * 2))
+    flags = dict(zip(*[iter(vllm_args.server_args(model_cfg, "0.5")[1:])] * 2, strict=True))
     assert flags["--gpu-memory-utilization"] == "0.5"
 
 

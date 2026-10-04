@@ -4,6 +4,7 @@ Implements just enough of vLLM's surface — /health, /v1/models, /v1/chat/compl
 /metrics — to exercise the chart's Service, probes, NetworkPolicy and storage.
 It is NOT a model: answers are canned. Never use it for quality or performance results.
 """
+
 from __future__ import annotations
 
 import json
@@ -39,12 +40,21 @@ class Handler(BaseHTTPRequestHandler):
         if self.path == "/health":
             return self._send(200, {})
         if self.path == "/v1/models":
-            return self._send(200, {"object": "list", "data": [
-                {"id": SERVED_NAME, "object": "model", "root": ROOT, "owned_by": "llm-platform-mock"}]})
+            return self._send(
+                200,
+                {
+                    "object": "list",
+                    "data": [
+                        {"id": SERVED_NAME, "object": "model", "root": ROOT, "owned_by": "llm-platform-mock"}
+                    ],
+                },
+            )
         if self.path == "/metrics":
-            return self._send(200, "".join(
-                f'mock_requests_total{{result="{k}"}} {v}\n' for k, v in REQUESTS.items()),
-                "text/plain; version=0.0.4")
+            return self._send(
+                200,
+                "".join(f'mock_requests_total{{result="{k}"}} {v}\n' for k, v in REQUESTS.items()),
+                "text/plain; version=0.0.4",
+            )
         self._send(404, {"error": {"message": "not found"}})
 
     def do_POST(self):
@@ -59,14 +69,27 @@ class Handler(BaseHTTPRequestHandler):
         out = words[:max_tokens]
         prompt_tokens = sum(len(m.get("content", "").split()) for m in req.get("messages", []))
         REQUESTS["ok"] += 1
-        self._send(200, {
-            "id": "chatcmpl-mock", "object": "chat.completion", "created": int(time.time()),
-            "model": SERVED_NAME,
-            "choices": [{"index": 0, "message": {"role": "assistant", "content": " ".join(out)},
-                         "finish_reason": "length" if len(words) > max_tokens else "stop"}],
-            "usage": {"prompt_tokens": prompt_tokens, "completion_tokens": len(out),
-                      "total_tokens": prompt_tokens + len(out)},
-        })
+        self._send(
+            200,
+            {
+                "id": "chatcmpl-mock",
+                "object": "chat.completion",
+                "created": int(time.time()),
+                "model": SERVED_NAME,
+                "choices": [
+                    {
+                        "index": 0,
+                        "message": {"role": "assistant", "content": " ".join(out)},
+                        "finish_reason": "length" if len(words) > max_tokens else "stop",
+                    }
+                ],
+                "usage": {
+                    "prompt_tokens": prompt_tokens,
+                    "completion_tokens": len(out),
+                    "total_tokens": prompt_tokens + len(out),
+                },
+            },
+        )
 
 
 def main() -> None:

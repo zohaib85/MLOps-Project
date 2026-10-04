@@ -2,15 +2,15 @@
 
 Requires `helm` on PATH (or HELM=/path/to/helm); skipped otherwise.
 """
+
 import os
 import shutil
 import subprocess
 
 import pytest
-import yaml
-
 import render_chart_values
 import vllm_args
+import yaml
 
 HELM = os.environ.get("HELM") or shutil.which("helm")
 pytestmark = pytest.mark.skipif(not HELM, reason="helm not installed")
@@ -18,9 +18,22 @@ ENVS = ["kind", "aks"]
 
 
 def render(repo_root, env, *extra):
-    cmd = [HELM, "template", "llm", str(repo_root / "charts/vllm"), "-n", "llm",
-           "-f", str(repo_root / "charts/vllm/values-model.yaml"),
-           "-f", str(repo_root / f"deploy/envs/{env}/values.yaml"), *extra]
+    cmd = [
+        HELM,
+        "template",
+        "llm",
+        str(repo_root / "charts/vllm"),
+        "-n",
+        "llm",
+        "-f",
+        str(repo_root / "charts/vllm/values-model.yaml"),
+        "-f",
+        str(repo_root / f"deploy/envs/{env}/values.yaml"),
+    ]
+    ci_owned = repo_root / f"deploy/envs/{env}/harness-image.yaml"
+    if ci_owned.exists():
+        cmd += ["-f", str(ci_owned)]
+    cmd += list(extra)
     out = subprocess.run(cmd, check=True, capture_output=True, text=True).stdout
     return [d for d in yaml.safe_load_all(out) if d]
 
@@ -41,10 +54,20 @@ def test_generated_values_in_sync(repo_root, model_cfg):
 
 @pytest.mark.parametrize("env", ENVS)
 def test_helm_lint(repo_root, env):
-    subprocess.run([HELM, "lint", "--strict", str(repo_root / "charts/vllm"),
-                    "-f", str(repo_root / "charts/vllm/values-model.yaml"),
-                    "-f", str(repo_root / f"deploy/envs/{env}/values.yaml")],
-                   check=True, capture_output=True)
+    subprocess.run(
+        [
+            HELM,
+            "lint",
+            "--strict",
+            str(repo_root / "charts/vllm"),
+            "-f",
+            str(repo_root / "charts/vllm/values-model.yaml"),
+            "-f",
+            str(repo_root / f"deploy/envs/{env}/values.yaml"),
+        ],
+        check=True,
+        capture_output=True,
+    )
 
 
 @pytest.mark.parametrize("env", ENVS)

@@ -8,6 +8,7 @@ Usage:
     python3 scripts/vllm_args.py --image     # image@digest
     python3 scripts/vllm_args.py --served-name
 """
+
 from __future__ import annotations
 
 import argparse
@@ -40,14 +41,22 @@ def server_args(cfg: dict, gpu_memory_utilization: float | str | None = None) ->
     gpu_util = gpu_memory_utilization or s["gpu_memory_utilization"]
     return [
         m["id"],  # positional: `vllm serve <model>` (--model is deprecated)
-        "--revision", m["revision"],
-        "--tokenizer-revision", m["revision"],
-        "--served-model-name", m["served_name"],
-        "--dtype", s["dtype"],
-        "--max-model-len", str(s["max_model_len"]),
-        "--gpu-memory-utilization", str(gpu_util),
-        "--max-num-seqs", str(s["max_num_seqs"]),
-        "--seed", str(s["seed"]),
+        "--revision",
+        m["revision"],
+        "--tokenizer-revision",
+        m["revision"],
+        "--served-model-name",
+        m["served_name"],
+        "--dtype",
+        s["dtype"],
+        "--max-model-len",
+        str(s["max_model_len"]),
+        "--gpu-memory-utilization",
+        str(gpu_util),
+        "--max-num-seqs",
+        str(s["max_num_seqs"]),
+        "--seed",
+        str(s["seed"]),
     ]
 
 

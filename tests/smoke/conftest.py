@@ -1,8 +1,10 @@
 """Smoke-test fixtures: talk to a running OpenAI-compatible endpoint and record run metadata."""
+
 import json
 import os
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from pathlib import Path
 
 import httpx
 import pytest
@@ -47,19 +49,19 @@ def run_record(repo_root, model_cfg, base_url, prompt_set):
     Ties every smoke run to model id + revision + image + prompt-set version.
     """
     record = {
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "base_url": base_url,
         "model_id": model_cfg["model"]["id"],
         "model_revision": model_cfg["model"]["revision"],
         "served_name": model_cfg["model"]["served_name"],
         "image": f"{model_cfg['runtime']['image']}:{model_cfg['runtime']['version']}"
-                 f"@{model_cfg['runtime']['digest']}",
+        f"@{model_cfg['runtime']['digest']}",
         "prompt_set": prompt_set["version"],
         "results": [],
     }
     yield record
-    out_dir = repo_root / "results" / "raw"
+    out_dir = Path(os.environ.get("RESULTS_DIR", repo_root / "results" / "raw"))
     out_dir.mkdir(parents=True, exist_ok=True)
     path = out_dir / f"smoke-{time.strftime('%Y%m%dT%H%M%S')}.json"
     path.write_text(json.dumps(record, indent=2))
-    print(f"\nSmoke run record: {path.relative_to(repo_root)}")
+    print(f"\nSmoke run record: {path}")

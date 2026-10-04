@@ -79,6 +79,7 @@ curl -s localhost:8000/v1/chat/completions -H 'Content-Type: application/json' -
 - [Local GPU dev setup (Windows + WSL2)](docs/learning/local-gpu-setup.md)
 - [AKS Lab 01 — GPU cluster by hand](docs/learning/aks-lab-01-cluster.md)
 - [Step 6 — Helm chart on kind](docs/learning/step6-helm-chart.md)
+- [Step 7 — CI pipeline](docs/learning/step7-ci.md)
 
 ## Scope & limitations
 

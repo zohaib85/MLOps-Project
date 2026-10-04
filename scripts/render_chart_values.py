@@ -4,6 +4,7 @@
 config/model.yaml stays the single source of truth; this file is the Helm-facing copy.
 CI fails if the committed copy drifts (tests/unit/test_chart.py). Regenerate with `make values`.
 """
+
 from __future__ import annotations
 
 import argparse

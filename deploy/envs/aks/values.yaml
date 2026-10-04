@@ -17,7 +17,3 @@ modelCache:
 resources:
   requests: { cpu: "2", memory: 8Gi }
   limits: { memory: 20Gi }
-mock:
-  image:
-    repository: ghcr.io/zohaib85/llm-platform-harness   # used by `helm test` only
-    tag: dev
