@@ -82,6 +82,13 @@ kubectl -n llm run probe --rm -it --restart=Never --image=busybox:1.36 -- \
 ```
 If the first call succeeds, your kind CNI isn't enforcing NetworkPolicy — note it; AKS (Cilium) does.
 
+## Bug found on the first kind run (and what it taught)
+`make kind-test` timed out. The helm-test pod reused the chart's labels, so it matched **both** the
+Service selector (traffic could be routed to the test pod itself) and the NetworkPolicy podSelector
+(its egress was limited to DNS + 443, so the call to :8000 was dropped). Fix: the test pod gets its own
+labels; `test_only_server_pods_match_selectors` guards against regressions.
+Side finding: kind's default CNI **did enforce** the NetworkPolicy.
+
 ## Clean up
 ```bash
 make kind-down

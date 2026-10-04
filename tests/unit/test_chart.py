@@ -82,6 +82,26 @@ def test_network_policy(repo_root, env):
     assert all("169.254.169.254/32" in b.get("except", []) for b in blocks)
 
 
+@pytest.mark.parametrize("env", ENVS)
+def test_only_server_pods_match_selectors(repo_root, env):
+    """Regression: the helm-test pod once matched the Service + NetworkPolicy selectors,
+    so its own requests were blocked by the server's egress rules (and could be routed to itself)."""
+    docs = render(repo_root, env)
+    (svc,) = kind_of(docs, "Service")
+    (np,) = kind_of(docs, "NetworkPolicy")
+    selectors = [svc["spec"]["selector"], np["spec"]["podSelector"]["matchLabels"]]
+    dep, _, _ = deployment(docs)
+    pod_label_sets = {"server": dep["spec"]["template"]["metadata"]["labels"]}
+    pod_label_sets |= {p["metadata"]["name"]: p["metadata"]["labels"] for p in kind_of(docs, "Pod")}
+
+    def matches(sel, labels):
+        return all(labels.get(k) == v for k, v in sel.items())
+
+    for name, labels in pod_label_sets.items():
+        for sel in selectors:
+            assert matches(sel, labels) == (name == "server"), f"{name} vs selector {sel}"
+
+
 def test_aks_runs_pinned_vllm_on_gpu(repo_root, model_cfg):
     docs = render(repo_root, "aks")
     dep, pod, c = deployment(docs)
