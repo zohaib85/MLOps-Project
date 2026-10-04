@@ -18,7 +18,7 @@ Files: `versions.tf` (pins Terraform ≥1.9, azurerm `~> 5.8`) · `variables.tf`
 | Decision | Why |
 |---|---|
 | GPU pool starts at **0 nodes**; `make gpu-on/off` scales it; Terraform `ignore_changes = [node_count]` | The expensive node only exists during GPU sessions. Terraform owns the *shape*, day-to-day *scale* is operational — and doesn't create drift |
-| GPU `upgrade_settings { max_surge = "0", max_unavailable = "1" }` | Quota is exactly one T4 node — a surge node would fail. Upgrade in place instead |
+| GPU `upgrade_settings { max_unavailable = "1" }` (no surge) | Quota is exactly one T4 node — a surge node would fail. Upgrade in place instead. (azurerm v5 rejects setting `max_surge` together with it — caught by `terraform validate`) |
 | `api_server_access_profile.authorized_ip_ranges` (validation forbids `0.0.0.0/0`) | The control plane isn't reachable from the whole internet |
 | Budget at **subscription scope filtered by tag**, not on the resource group | VMs, disks and LBs live in the AKS-managed `MC_` group; a budget on `rg-llm-lab` would miss most of the spend. AKS propagates tags to node resources |
 | `node_provisioning_profile { mode = "Manual" }` | **Required in azurerm v5** — v4 tutorials omit it and fail. `Auto` = Node Auto Provisioning (Karpenter) |
@@ -54,6 +54,11 @@ make infra-up                                    # ~8-10 min; ends with kubectl 
 kubectl get nodes -o wide                        # 1 system node; GPU pool exists with 0 nodes
 ```
 Cost while idle (GPU at 0): roughly the system node only. **Tear down when you stop for the day.**
+
+**Commit the lock file once:** your first `terraform init` creates `infra/terraform/.terraform.lock.hcl`
+(provider checksums from the official registry). Commit it — every later `init` (yours and CI's) then
+verifies it downloads exactly the same provider build. It wasn't committed earlier because the version
+used for validation in the build session was compiled from source, so its checksums differ from the registry.
 
 ## Teardown
 ```bash

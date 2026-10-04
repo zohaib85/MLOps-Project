@@ -82,9 +82,9 @@ resource "azurerm_kubernetes_cluster_node_pool" "gpu" {
   node_taints = ["sku=gpu:NoSchedule"] # repel everything that doesn't tolerate it
   node_labels = { workload = "gpu" }   # let GPU workloads select this pool
 
-  # Quota is exactly one GPU node: upgrade in place instead of adding a surge node.
+  # Quota is exactly one GPU node: upgrade in place (take the node down) instead of adding a
+  # surge node. In azurerm v5 max_unavailable conflicts with max_surge — setting it implies no surge.
   upgrade_settings {
-    max_surge       = "0"
     max_unavailable = "1"
   }
 
