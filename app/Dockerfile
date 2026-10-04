@@ -7,6 +7,15 @@ ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1 \
     RESULTS_DIR=/tmp/results
 WORKDIR /opt/llm-platform
 
+# Apply Debian security updates on top of the pinned base. The base digest only moves when
+# Docker rebuilds python:3.12-slim; fixes (e.g. CVE-2026-103111 in libpcre2, fixed in
+# 10.46-1~deb13u3) often land in Debian first. Reproducibility comes from publishing the
+# *result* by digest — the image CI tests and scans is exactly the one that ships.
+RUN apt-get update \
+ && apt-get upgrade -y --no-install-recommends \
+ && apt-get clean \
+ && rm -rf /var/lib/apt/lists/*
+
 COPY requirements-dev.txt .
 RUN pip install -r requirements-dev.txt
 
