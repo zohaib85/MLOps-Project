@@ -3,6 +3,33 @@
 **Goal:** every change is tested, validated, scanned and (on `main`) published as an immutable
 image — and CI never touches the cluster.
 
+## In plain English
+**Every time code changes, a robot borrows a fresh computer, runs a checklist of inspections, and only lets
+the change become a release if every inspection passes.**
+
+Think of a factory: the PR is a product arriving for inspection; CI is a team of inspectors with pass/reject
+stamps; `main` is the warehouse that only accepts fully-stamped products; on merge, shipping labels the box with
+an unchangeable serial number (the image digest) and writes it in the logbook (Git); Argo CD is the delivery truck
+that reads the logbook and delivers exactly that box to the cluster.
+
+| Inspector | Question it answers |
+|---|---|
+| **test** | Is the code tidy, and does it do what we say it does? |
+| **manifests** | Would our Kubernetes files be valid, and do they follow our safety rules? |
+| **secrets** | Did anyone ever commit a password or key — even one deleted later? |
+| **image** | Does the container build, actually work, and contain no known *fixable* security holes? |
+
+On a **PR**: inspect only, never publish. On **merge to `main`**: inspect again, then **publish** the image by
+digest and **record** the digest in Git (`deploy/envs/aks/harness-image.yaml`) — the release receipt.
+
+Rules behind the design: same checks locally and in CI (`make lint test`) · only reviewed code becomes a
+release · labels that can't be swapped (digests) · helpers pinned exactly (SHA-pinned actions) · each job gets
+only the keys it needs · the robot never holds the keys to the cluster.
+
+**Worked example (Oct 2026):** the `image` inspector rejected the build on CVE-2026-103111 in `libpcre2`
+(OS package from the base image; fix available in Debian). The base image hadn't been rebuilt yet, so the
+Dockerfile now applies Debian security updates; ignoring the CVE was rejected because a fix existed.
+
 ## Pipeline (`.github/workflows/ci.yml`)
 ```
 PR / push ──► test ─────────┐
