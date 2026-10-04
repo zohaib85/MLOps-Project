@@ -37,8 +37,8 @@ Build window: 24 Sep – 21 Oct 2026 · ~8–10 h/week · personal learning proj
 
 ### Week 2 — Kubernetes + GitOps (exit: reproducible release)
 - [x] 6. Helm chart `charts/vllm`: GPU request, probes, securityContext, NetworkPolicy, SA, model-cache PVC ([guide](learning/step6-helm-chart.md))
-- [ ] 7. CI: pytest, helm lint/template, kubeconform, policy check, Trivy, gitleaks, publish by digest, digest bump ([guide](learning/step7-ci.md)) — workflow written; first green run pending
-- [ ] 8. Argo CD Application + AppProject (kind first, then AKS)
+- [x] 7. CI: pytest, helm lint/template, kubeconform, policy check, Trivy, gitleaks, publish by digest, digest bump ([guide](learning/step7-ci.md)) — green on PR #2
+- [ ] 8. Argo CD Application + AppProject (kind first, then AKS) ([guide](learning/step8-argocd.md)) — manifests + tests done; kind run pending
 - [ ] 9. Terraform: AKS + GPU pool + budget alert; `make down` teardown
 - [ ] 10. Exit gate: Git change → traceable release; previous version restorable
 

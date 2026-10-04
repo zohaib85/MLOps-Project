@@ -1,0 +1,33 @@
+# Desired state for the local kind cluster: Argo CD renders charts/vllm with the kind values
+# straight from Git (branch `main`) and keeps the cluster matching it.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: llm-kind
+  namespace: argocd
+spec:
+  project: llm-platform
+  source:
+    repoURL: https://github.com/zohaib85/MLOps-Project.git
+    targetRevision: main
+    path: charts/vllm
+    helm:
+      releaseName: llm
+      valueFiles:
+        - values-model.yaml                        # generated from config/model.yaml
+        - ../../deploy/envs/kind/values.yaml       # kind overlay (mock engine, no GPU)
+      parameters:
+        - name: test.enabled                       # helm-test hooks are run by `helm test`, not Argo
+          value: "false"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: llm
+  syncPolicy:
+    automated:
+      prune: true        # delete resources that were removed from Git
+      selfHeal: true     # revert manual kubectl changes (drift) back to Git
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 3
+      backoff: { duration: 10s, factor: 2, maxDuration: 2m }

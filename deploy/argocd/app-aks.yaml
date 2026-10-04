@@ -1,0 +1,34 @@
+# Desired state for AKS (step 10): real vLLM on the T4 pool. CI writes harness-image.yaml;
+# a human changes config/model.yaml or the AKS overlay via PR. Argo CD never needs CI credentials.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: llm-aks
+  namespace: argocd
+spec:
+  project: llm-platform
+  source:
+    repoURL: https://github.com/zohaib85/MLOps-Project.git
+    targetRevision: main
+    path: charts/vllm
+    helm:
+      releaseName: llm
+      valueFiles:
+        - values-model.yaml
+        - ../../deploy/envs/aks/values.yaml
+        - ../../deploy/envs/aks/harness-image.yaml # CI-owned
+      parameters:
+        - name: test.enabled
+          value: "false"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: llm
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 3
+      backoff: { duration: 30s, factor: 2, maxDuration: 5m }

@@ -7,6 +7,7 @@ HELM         ?= helm
 RELEASE      ?= llm
 NAMESPACE    ?= llm
 HARNESS_IMAGE ?= llm-platform-harness:dev
+ARGOCD_VERSION ?= v3.5.3
 CONFTEST     ?= conftest
 KUBECONFORM  ?= kubeconform
 ENVS         := kind aks
@@ -58,6 +59,7 @@ test: ## Run unit tests (no server needed)
 	$(PYTHON) -m pytest
 
 ## --- Week 2: packaging, delivery, infrastructure ---
+.PHONY: kind-load argocd-install argocd-apps argocd-ui argocd-password argocd-status
 .PHONY: values chart-lint validate policy-test harness-image kind-up kind-down kind-deploy kind-test kind-smoke lint infra-up infra-down
 values: ## Regenerate charts/vllm/values-model.yaml from config/model.yaml
 	$(PYTHON) scripts/render_chart_values.py
@@ -83,6 +85,23 @@ kind-deploy: harness-image ## Build + load harness image, helm install the chart
 	kind load docker-image $(HARNESS_IMAGE) --name $(KIND_CLUSTER)
 	$(HELM) upgrade --install $(RELEASE) charts/vllm -n $(NAMESPACE) --create-namespace \
 	  $(call values_files,kind) --wait --timeout 5m
+kind-load: harness-image ## Build the harness image and load it into kind (needed before Argo CD syncs)
+	kind load docker-image $(HARNESS_IMAGE) --name $(KIND_CLUSTER)
+argocd-install: ## Install Argo CD (pinned) into the current cluster
+	@echo "context: $$(kubectl config current-context)"
+	kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
+	kubectl apply -n argocd --server-side --force-conflicts \
+	  -f https://raw.githubusercontent.com/argoproj/argo-cd/$(ARGOCD_VERSION)/manifests/install.yaml
+	kubectl -n argocd rollout status deploy/argocd-server --timeout=5m
+	kubectl -n argocd rollout status statefulset/argocd-application-controller --timeout=5m
+argocd-apps: ## Register the AppProject + kind Application (Argo CD then syncs from Git)
+	kubectl apply -f deploy/argocd/project.yaml -f deploy/argocd/app-kind.yaml
+argocd-ui: ## Argo CD UI on https://localhost:8080 (user: admin, password: make argocd-password)
+	kubectl -n argocd port-forward svc/argocd-server 8080:443
+argocd-password: ## Print the initial admin password
+	@kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d; echo
+argocd-status: ## Sync + health status of Argo CD Applications
+	kubectl -n argocd get applications -o wide
 kind-test: ## helm test: in-cluster client reaches /health and /v1/models
 	$(HELM) test $(RELEASE) -n $(NAMESPACE) --logs
 kind-smoke: ## Port-forward and run smoke tests (quality gate skipped: mock is not a model)
