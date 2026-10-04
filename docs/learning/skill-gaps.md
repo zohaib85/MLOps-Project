@@ -180,5 +180,5 @@ Gotcha we hit: conftest treats rules named `violation` like `deny` — that's wh
 | GitHub Actions | ☐ | ☐ | ☐ |
 | Rego / conftest | ☐ | ☐ | ☐ |
 
-Later additions to this list as we go: **Argo CD** (step 8 — start with docs/learning/step8-argocd.md), **Terraform for AKS** (step 9),
+Later additions to this list as we go: **Argo CD** (step 8 — start with docs/learning/step8-argocd.md), **Terraform for AKS** (step 9 — start with docs/learning/step9-terraform.md),
 **Prometheus/PromQL** (week 3).

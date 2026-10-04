@@ -1,0 +1,9 @@
+# Copy to terraform.tfvars (git-ignored) and fill in.
+#   curl -s https://ifconfig.me   → your public IP
+api_server_authorized_ip_ranges = ["203.0.113.7/32"]
+budget_contact_email            = "you@example.com"
+
+# Optional overrides
+# location       = "eastus"
+# budget_amount  = 50
+# gpu_node_count = 0

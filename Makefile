@@ -8,6 +8,11 @@ RELEASE      ?= llm
 NAMESPACE    ?= llm
 HARNESS_IMAGE ?= llm-platform-harness:dev
 ARGOCD_VERSION ?= v3.5.3
+TF_DIR       ?= infra/terraform
+TERRAFORM    ?= terraform
+TF           = $(TERRAFORM) -chdir=$(TF_DIR)
+# Read cluster coordinates from Terraform outputs (empty until applied).
+tf_out = $(shell $(TF) output -raw $(1) 2>/dev/null)
 CONFTEST     ?= conftest
 KUBECONFORM  ?= kubeconform
 ENVS         := kind aks
@@ -60,7 +65,7 @@ test: ## Run unit tests (no server needed)
 
 ## --- Week 2: packaging, delivery, infrastructure ---
 .PHONY: kind-load argocd-install argocd-apps argocd-ui argocd-password argocd-status
-.PHONY: values chart-lint validate policy-test harness-image kind-up kind-down kind-deploy kind-test kind-smoke lint infra-up infra-down
+.PHONY: values chart-lint validate policy-test harness-image kind-up kind-down kind-deploy kind-test kind-smoke lint
 values: ## Regenerate charts/vllm/values-model.yaml from config/model.yaml
 	$(PYTHON) scripts/render_chart_values.py
 chart-lint: ## helm lint the chart for every environment
@@ -111,10 +116,33 @@ lint: chart-lint ## ruff (Python) + helm lint + generated-values drift check
 	ruff check .
 	ruff format --check .
 	$(PYTHON) scripts/render_chart_values.py --check
-infra-up: ## Terraform apply: AKS + GPU pool + budget alert
-	$(call todo,Week 2 step 9)
-infra-down: ## Terraform destroy: remove ALL billable Azure resources
-	$(call todo,Week 2 step 9)
+.PHONY: preflight infra-init infra-plan infra-up infra-down aks-credentials gpu-on gpu-off tf-check
+# azurerm v4+ needs the subscription explicitly; take it from the current az login (Terraform targets only).
+infra-init infra-plan infra-up infra-down: export ARM_SUBSCRIPTION_ID ?= $(shell az account show --query id -o tsv 2>/dev/null)
+preflight: ## Azure pre-flight: login, SKU restrictions, vCPU quota (Lab 01 lessons)
+	scripts/azure_preflight.sh
+tf-check: ## terraform fmt + validate (no Azure access needed)
+	$(TF) fmt -check -recursive
+	$(TF) init -backend=false -input=false >/dev/null
+	$(TF) validate
+infra-init: ## terraform init
+	$(TF) init -input=false
+infra-plan: infra-init ## terraform plan (needs infra/terraform/terraform.tfvars)
+	@test -f $(TF_DIR)/terraform.tfvars || { echo "copy $(TF_DIR)/terraform.tfvars.example to terraform.tfvars first"; exit 1; }
+	@test -n "$(ARM_SUBSCRIPTION_ID)" || { echo "not logged in: az login"; exit 1; }
+	$(TF) plan -input=false -out=tfplan
+infra-up: preflight infra-plan ## Pre-flight + plan + apply: AKS, GPU pool (0 nodes), project budget
+	$(TF) apply -input=false tfplan
+	$(MAKE) aks-credentials
+infra-down: ## Terraform destroy: remove ALL billable Azure resources (cluster, MC_ group, budget)
+	$(TF) destroy -input=false
+aks-credentials: ## Merge AKS credentials into kubeconfig and switch context
+	az aks get-credentials -g $(call tf_out,resource_group) -n $(call tf_out,cluster_name) --overwrite-existing
+	kubectl config current-context
+gpu-on: ## Scale the GPU pool to 1 node (billing for the T4 starts now)
+	az aks nodepool scale -g $(call tf_out,resource_group) --cluster-name $(call tf_out,cluster_name) -n gpu --node-count 1
+gpu-off: ## Scale the GPU pool to 0 nodes (stop paying for the GPU)
+	az aks nodepool scale -g $(call tf_out,resource_group) --cluster-name $(call tf_out,cluster_name) -n gpu --node-count 0
 
 ## --- Week 4: evidence ---
 .PHONY: bench

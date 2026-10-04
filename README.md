@@ -81,6 +81,7 @@ curl -s localhost:8000/v1/chat/completions -H 'Content-Type: application/json' -
 - [Step 6 — Helm chart on kind](docs/learning/step6-helm-chart.md)
 - [Step 7 — CI pipeline](docs/learning/step7-ci.md)
 - [Step 8 — GitOps with Argo CD](docs/learning/step8-argocd.md)
+- [Step 9 — Terraform for AKS](docs/learning/step9-terraform.md)
 - [Skill gaps — Helm, GitHub Actions, Rego study plan](docs/learning/skill-gaps.md)
 
 ## Scope & limitations
