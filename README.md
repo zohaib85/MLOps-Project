@@ -80,6 +80,7 @@ curl -s localhost:8000/v1/chat/completions -H 'Content-Type: application/json' -
 - [AKS Lab 01 — GPU cluster by hand](docs/learning/aks-lab-01-cluster.md)
 - [Step 6 — Helm chart on kind](docs/learning/step6-helm-chart.md)
 - [Step 7 — CI pipeline](docs/learning/step7-ci.md)
+- [Skill gaps — Helm, GitHub Actions, Rego study plan](docs/learning/skill-gaps.md)
 
 ## Scope & limitations
 
