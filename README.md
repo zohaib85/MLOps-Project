@@ -69,6 +69,7 @@ curl -s localhost:8000/v1/chat/completions -H 'Content-Type: application/json' -
 | Model weights | Docker volume `hf-cache` → `/root/.cache/huggingface` in the container | Downloaded once at the pinned revision; never in Git |
 | Smoke-run records | `results/raw/smoke-*.json` (git-ignored) | Each run tagged with model revision, image digest, prompt-set version |
 | Regression prompts | `app/prompts/smoke-v*.yaml` | Versioned; never edited in place |
+| Helm chart | `charts/vllm` (+ generated `values-model.yaml`) | One chart; env overlays in `deploy/envs/{kind,aks}` |
 
 ## Documentation
 
@@ -77,6 +78,7 @@ curl -s localhost:8000/v1/chat/completions -H 'Content-Type: application/json' -
 - [AKS learning notes](docs/learning/aks-notes.md)
 - [Local GPU dev setup (Windows + WSL2)](docs/learning/local-gpu-setup.md)
 - [AKS Lab 01 — GPU cluster by hand](docs/learning/aks-lab-01-cluster.md)
+- [Step 6 — Helm chart on kind](docs/learning/step6-helm-chart.md)
 
 ## Scope & limitations
 

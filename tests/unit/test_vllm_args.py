@@ -17,7 +17,7 @@ def test_image_pinned_by_digest(model_cfg):
 
 
 def test_server_args_come_from_config(model_cfg, monkeypatch):
-    monkeypatch.delenv("GPU_MEMORY_UTILIZATION", raising=False)
+    monkeypatch.setenv("GPU_MEMORY_UTILIZATION", "0.1")  # must NOT leak into the shared function
     args = vllm_args.server_args(model_cfg)
     m, s = model_cfg["model"], model_cfg["serving"]
     assert args[0] == m["id"], "model must be the positional first argument"
@@ -30,9 +30,8 @@ def test_server_args_come_from_config(model_cfg, monkeypatch):
     assert flags["--gpu-memory-utilization"] == str(s["gpu_memory_utilization"])
 
 
-def test_gpu_memory_override(model_cfg, monkeypatch):
-    monkeypatch.setenv("GPU_MEMORY_UTILIZATION", "0.5")
-    flags = dict(zip(*[iter(vllm_args.server_args(model_cfg)[1:])] * 2))
+def test_gpu_memory_override(model_cfg):
+    flags = dict(zip(*[iter(vllm_args.server_args(model_cfg, "0.5")[1:])] * 2))
     assert flags["--gpu-memory-utilization"] == "0.5"
 
 

@@ -36,7 +36,7 @@ Build window: 24 Sep – 21 Oct 2026 · ~8–10 h/week · personal learning proj
 - [x] AKS Lab 01: hand-built cluster + GPU pool + device plugin ([guide](learning/aks-lab-01-cluster.md))
 
 ### Week 2 — Kubernetes + GitOps (exit: reproducible release)
-- [ ] 6. Helm chart `charts/vllm`: GPU request, probes, securityContext, NetworkPolicy, SA, model-cache PVC
+- [ ] 6. Helm chart `charts/vllm`: GPU request, probes, securityContext, NetworkPolicy, SA, model-cache PVC ([guide](learning/step6-helm-chart.md)) — chart + tests done; kind run pending
 - [ ] 7. CI: pytest, helm lint/template, kubeconform, policy check, Trivy, gitleaks, publish by digest, digest bump
 - [ ] 8. Argo CD Application + AppProject (kind first, then AKS)
 - [ ] 9. Terraform: AKS + GPU pool + budget alert; `make down` teardown

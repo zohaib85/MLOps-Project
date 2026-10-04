@@ -34,10 +34,10 @@ def image_ref(cfg: dict) -> str:
     return f"{rt['image']}:{rt['version']}@{rt['digest']}"
 
 
-def server_args(cfg: dict) -> list[str]:
+def server_args(cfg: dict, gpu_memory_utilization: float | str | None = None) -> list[str]:
+    """vLLM CLI args from the model card. Shared by `make serve` and the Helm values generator."""
     m, s = cfg["model"], cfg["serving"]
-    # Laptop GPUs share memory with other processes; allow a local override.
-    gpu_util = os.environ.get("GPU_MEMORY_UTILIZATION", s["gpu_memory_utilization"])
+    gpu_util = gpu_memory_utilization or s["gpu_memory_utilization"]
     return [
         m["id"],  # positional: `vllm serve <model>` (--model is deprecated)
         "--revision", m["revision"],
@@ -64,7 +64,8 @@ def main() -> None:
     elif a.served_name:
         print(cfg["model"]["served_name"])
     else:
-        print("\n".join(server_args(cfg)))
+        # Laptop GPUs share memory with the desktop; `make serve` passes a local override.
+        print("\n".join(server_args(cfg, os.environ.get("GPU_MEMORY_UTILIZATION"))))
 
 
 if __name__ == "__main__":

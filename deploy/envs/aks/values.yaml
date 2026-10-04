@@ -1,0 +1,23 @@
+# AKS: real vLLM on the T4 GPU pool (see docs/learning/aks-lab-01-cluster.md).
+engine: vllm
+gpu:
+  enabled: true
+  count: 1
+nodeSelector:
+  workload: gpu
+tolerations:
+  - key: sku
+    operator: Equal
+    value: gpu
+    effect: NoSchedule
+modelCache:
+  storageClassName: managed-csi
+  size: 20Gi
+# Standard_NC4as_T4_v3: 4 vCPU / 28 GiB RAM / 1x T4 16 GiB
+resources:
+  requests: { cpu: "2", memory: 8Gi }
+  limits: { memory: 20Gi }
+mock:
+  image:
+    repository: ghcr.io/zohaib85/llm-platform-harness   # used by `helm test` only
+    tag: dev

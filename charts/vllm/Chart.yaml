@@ -1,0 +1,7 @@
+apiVersion: v2
+name: vllm
+description: OpenAI-compatible LLM inference with vLLM — GPU-aware, secure by default, model-cache backed.
+type: application
+version: 0.1.0
+# vLLM runtime the chart is tested with (see config/model.yaml for the pinned digest).
+appVersion: "v0.29.0-cu129"

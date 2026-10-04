@@ -1,0 +1,29 @@
+# GENERATED from config/model.yaml by scripts/render_chart_values.py — do not edit.
+# Regenerate with: make values
+model:
+  id: Qwen/Qwen2.5-0.5B-Instruct
+  revision: 7ae557604adf67be50417f59c2c2f167def9a775
+  servedName: qwen2.5-0.5b-instruct
+vllm:
+  image:
+    repository: docker.io/vllm/vllm-openai
+    tag: v0.29.0-cu129
+    digest: sha256:7ef5a35d1ef8ce2cf9d671dd91eec6e367c5849262e0362b4d3d4a26be0d87d2
+  args:
+  - Qwen/Qwen2.5-0.5B-Instruct
+  - --revision
+  - 7ae557604adf67be50417f59c2c2f167def9a775
+  - --tokenizer-revision
+  - 7ae557604adf67be50417f59c2c2f167def9a775
+  - --served-model-name
+  - qwen2.5-0.5b-instruct
+  - --dtype
+  - float16
+  - --max-model-len
+  - '4096'
+  - --gpu-memory-utilization
+  - '0.85'
+  - --max-num-seqs
+  - '32'
+  - --seed
+  - '42'

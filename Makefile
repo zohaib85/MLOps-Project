@@ -3,6 +3,10 @@ SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
 KIND_CLUSTER ?= llm-platform
+HELM         ?= helm
+RELEASE      ?= llm
+NAMESPACE    ?= llm
+HARNESS_IMAGE ?= llm-platform-harness:dev
 PYTHON       ?= python3
 CONTAINER    ?= vllm-local
 PORT         ?= 8000
@@ -48,13 +52,33 @@ test: ## Run unit tests (no server needed)
 	$(PYTHON) -m pytest
 
 ## --- Week 2: packaging, delivery, infrastructure ---
-.PHONY: lint kind-up kind-down infra-up infra-down
-lint: ## Lint Python, Helm chart, and manifests
-	$(call todo,Week 2 step 7)
+.PHONY: values chart-lint harness-image kind-up kind-down kind-deploy kind-test kind-smoke lint infra-up infra-down
+values: ## Regenerate charts/vllm/values-model.yaml from config/model.yaml
+	$(PYTHON) scripts/render_chart_values.py
+chart-lint: ## helm lint the chart for every environment
+	@for e in kind aks; do \
+	  $(HELM) lint --strict charts/vllm -f charts/vllm/values-model.yaml -f deploy/envs/$$e/values.yaml || exit 1; \
+	done
+harness-image: ## Build the harness image (smoke tests + mock server)
+	docker build -t $(HARNESS_IMAGE) -f app/Dockerfile .
 kind-up: ## Create local kind cluster
-	$(call todo,Week 2 step 8)
+	kind create cluster --name $(KIND_CLUSTER) --wait 120s
+	kubectl config current-context
 kind-down: ## Delete local kind cluster
-	$(call todo,Week 2 step 8)
+	kind delete cluster --name $(KIND_CLUSTER)
+kind-deploy: harness-image ## Build + load harness image, helm install the chart (mock engine) on kind
+	@test "$$(kubectl config current-context)" = "kind-$(KIND_CLUSTER)" || \
+	  { echo "kubectl context is not kind-$(KIND_CLUSTER) — refusing to deploy"; exit 1; }
+	kind load docker-image $(HARNESS_IMAGE) --name $(KIND_CLUSTER)
+	$(HELM) upgrade --install $(RELEASE) charts/vllm -n $(NAMESPACE) --create-namespace \
+	  -f charts/vllm/values-model.yaml -f deploy/envs/kind/values.yaml --wait --timeout 5m
+kind-test: ## helm test: in-cluster client reaches /health and /v1/models
+	$(HELM) test $(RELEASE) -n $(NAMESPACE) --logs
+kind-smoke: ## Port-forward and run smoke tests (quality gate skipped: mock is not a model)
+	@kubectl -n $(NAMESPACE) port-forward svc/$(RELEASE)-vllm 8000:8000 >/dev/null 2>&1 & PF=$$!; \
+	sleep 3; $(PYTHON) -m pytest tests/smoke -v -k "not pass_rate"; RC=$$?; kill $$PF; exit $$RC
+lint: chart-lint ## Lint chart (Python/manifest linters arrive with CI in step 7)
+	$(PYTHON) scripts/render_chart_values.py --check
 infra-up: ## Terraform apply: AKS + GPU pool + budget alert
 	$(call todo,Week 2 step 9)
 infra-down: ## Terraform destroy: remove ALL billable Azure resources

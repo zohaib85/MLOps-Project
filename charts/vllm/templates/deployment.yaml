@@ -1,0 +1,139 @@
+{{- $isVllm := eq .Values.engine "vllm" }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "vllm.fullname" . }}
+  labels:
+    {{- include "vllm.labels" . | nindent 4 }}
+  annotations:
+    llm-platform/model-id: {{ .Values.model.id | quote }}
+    llm-platform/model-revision: {{ .Values.model.revision | quote }}
+spec:
+  replicas: 1
+  # Recreate, not RollingUpdate: with one GPU, a rolling update would schedule the new pod
+  # before the old one releases the GPU — it would sit Pending forever.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "vllm.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "vllm.labels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      serviceAccountName: {{ include "vllm.serviceAccountName" . }}
+      automountServiceAccountToken: {{ .Values.serviceAccount.automount }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: server
+          image: {{ include "vllm.image" . | quote }}
+          imagePullPolicy: {{ ternary .Values.vllm.image.pullPolicy .Values.mock.image.pullPolicy $isVllm }}
+          {{- if $isVllm }}
+          args:
+            {{- toYaml .Values.vllm.args | nindent 12 }}
+            - --host
+            - "0.0.0.0"
+            - --port
+            - "8000"
+          {{- end }}
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+          env:
+            # Writable HOME on an emptyDir: the root filesystem is read-only.
+            - name: HOME
+              value: /home/app
+            {{- if $isVllm }}
+            - name: HF_HOME
+              value: /models/hf
+            {{- with .Values.vllm.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+            {{- else }}
+            - name: MOCK_SERVED_NAME
+              value: {{ .Values.model.servedName | quote }}
+            - name: MOCK_ROOT
+              value: {{ .Values.model.id | quote }}
+            - name: MOCK_STARTUP_DELAY_S
+              value: {{ .Values.mock.startupDelaySeconds | quote }}
+            {{- end }}
+            {{- if .Values.auth.existingSecret }}
+            - name: VLLM_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.auth.existingSecret }}
+                  key: {{ .Values.auth.secretKey }}
+            {{- end }}
+          startupProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: {{ .Values.probes.startup.periodSeconds }}
+            failureThreshold: {{ .Values.probes.startup.failureThreshold }}
+            timeoutSeconds: {{ .Values.probes.startup.timeoutSeconds }}
+          readinessProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: {{ .Values.probes.readiness.periodSeconds }}
+            failureThreshold: {{ .Values.probes.readiness.failureThreshold }}
+            timeoutSeconds: {{ .Values.probes.readiness.timeoutSeconds }}
+          livenessProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: {{ .Values.probes.liveness.periodSeconds }}
+            failureThreshold: {{ .Values.probes.liveness.failureThreshold }}
+            timeoutSeconds: {{ .Values.probes.liveness.timeoutSeconds }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          resources:
+            {{- $res := deepCopy (default dict .Values.resources) }}
+            {{- if .Values.gpu.enabled }}
+            {{- $limits := default dict $res.limits }}
+            {{- $_ := set $limits "nvidia.com/gpu" .Values.gpu.count }}
+            {{- $_ := set $res "limits" $limits }}
+            {{- end }}
+            {{- toYaml $res | nindent 12 }}
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+            - { name: home, mountPath: /home/app }
+            - { name: model-cache, mountPath: /models }
+            {{- if $isVllm }}
+            - { name: shm, mountPath: /dev/shm }
+            {{- end }}
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: home
+          emptyDir: {}
+        - name: model-cache
+          {{- if .Values.modelCache.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "vllm.cacheClaimName" . }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+        {{- if $isVllm }}
+        - name: shm
+          emptyDir:
+            medium: Memory
+            sizeLimit: {{ .Values.shm.sizeLimit }}
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
