@@ -31,6 +31,8 @@ mock:
     pullPolicy: IfNotPresent
   # Simulates model loading so the startup probe is exercised.
   startupDelaySeconds: 20
+  # Fault injection for alert drills, e.g. {MOCK_ERROR_RATE: "0.3", MOCK_LATENCY_S: "6"}.
+  faults: {}
 
 gpu:
   enabled: true
@@ -107,6 +109,31 @@ networkPolicy:
     allowInternetHTTPS: true
     # Block the cloud instance metadata endpoint (credential theft path).
     blockMetadataEndpoint: true
+
+# Prometheus integration (kube-prometheus-stack CRDs). ServiceMonitor/PrometheusRule render only
+# when enabled AND the cluster serves monitoring.coreos.com/v1 (Argo CD passes the cluster's API
+# list to Helm), so the app still syncs before the monitoring stack exists. The NetworkPolicy lets
+# the monitoring namespace scrape :8000/metrics when the ServiceMonitor is enabled.
+metrics:
+  serviceMonitor:
+    enabled: false
+    interval: 15s
+    labels: {}
+  prometheusRule:
+    enabled: false
+    labels: {}
+  # Grafana dashboard ConfigMap (charts/vllm/dashboards/llm-inference.json). Plain ConfigMap, no CRD.
+  dashboard:
+    enabled: false
+  scrapeNamespace: monitoring
+  # SLOs for the demo window — see docs/slo.md. Latency threshold is set from the baseline run.
+  slo:
+    availabilityTarget: 0.99        # non-5xx share of /v1/chat/completions
+    latencyP95Seconds: 5            # p95 end-to-end latency objective
+  alerts:
+    queueWaitingThreshold: 5        # requests waiting for a slot
+    kvCacheUsageThreshold: 0.9      # fraction of KV cache in use
+  runbookBaseUrl: https://github.com/zohaib85/MLOps-Project/blob/main/docs/runbook.md
 
 podAnnotations: {}
 podLabels: {}

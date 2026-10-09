@@ -67,6 +67,10 @@ spec:
               value: {{ .Values.model.id | quote }}
             - name: MOCK_STARTUP_DELAY_S
               value: {{ .Values.mock.startupDelaySeconds | quote }}
+            {{- range $k, $v := .Values.mock.faults }}
+            - name: {{ $k }}
+              value: {{ $v | quote }}
+            {{- end }}
             {{- end }}
             {{- if .Values.auth.existingSecret }}
             - name: VLLM_API_KEY

@@ -1,0 +1,97 @@
+# promtool unit tests for the chart's alert rules — run with `make rules-test`.
+# The rules file is rendered from the Helm chart (aks values) into a temp dir first.
+# Series notation: 'a+bxN' = start at a, add b each step, N steps (interval below).
+rule_files:
+  - rules.yaml
+evaluation_interval: 30s
+
+tests:
+  # 20% of chat requests fail for 30 minutes → fast burn (threshold 14.4 × 1% = 14.4%).
+  - interval: 30s
+    input_series:
+      - series: 'http_requests_total{namespace="llm", service="llm-vllm", handler="/v1/chat/completions", method="POST", status="2xx"}'
+        values: '0+24x120'
+      - series: 'http_requests_total{namespace="llm", service="llm-vllm", handler="/v1/chat/completions", method="POST", status="5xx"}'
+        values: '0+6x120'
+    alert_rule_test:
+      - eval_time: 1m # condition true, but still 'pending' until 'for: 2m' has elapsed
+        alertname: LLMErrorBudgetFastBurn
+        exp_alerts: []
+      - eval_time: 30m
+        alertname: LLMErrorBudgetFastBurn
+        exp_alerts:
+          - exp_labels: { severity: critical }
+            exp_annotations:
+              summary: "5xx error ratio is burning the 0.99 availability SLO budget fast"
+              description: "5m error ratio 20%."
+              runbook_url: "https://github.com/zohaib85/MLOps-Project/blob/main/docs/runbook.md#llmerrorbudgetfastburn"
+
+  # 0.5% errors stays inside the budget → no page.
+  - interval: 30s
+    input_series:
+      - series: 'http_requests_total{namespace="llm", service="llm-vllm", handler="/v1/chat/completions", method="POST", status="2xx"}'
+        values: '0+199x120'
+      - series: 'http_requests_total{namespace="llm", service="llm-vllm", handler="/v1/chat/completions", method="POST", status="5xx"}'
+        values: '0+1x120'
+    alert_rule_test:
+      - eval_time: 60m
+        alertname: LLMErrorBudgetFastBurn
+        exp_alerts: []
+
+  # Target disappears (pod gone) → LLMEndpointDown after 5 minutes, thanks to 'or vector(0)'.
+  - interval: 30s
+    input_series:
+      - series: 'up{namespace="llm", service="llm-vllm", job="llm-vllm"}'
+        values: '1x10 _x40'
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: LLMEndpointDown
+        exp_alerts: []
+      - eval_time: 16m
+        alertname: LLMEndpointDown
+        exp_alerts:
+          - exp_labels: { severity: critical }
+            exp_annotations:
+              summary: "Inference endpoint llm-vllm is not being scraped / not up"
+              description: "No healthy /metrics target for 5m — the server is down, restarting, or still loading the model."
+              runbook_url: "https://github.com/zohaib85/MLOps-Project/blob/main/docs/runbook.md#llmendpointdown"
+
+  # Every request takes ~8 s (all observations land in the 10 s bucket) → p95 above the 5 s objective.
+  - interval: 30s
+    input_series:
+      - series: 'vllm:e2e_request_latency_seconds_bucket{namespace="llm", service="llm-vllm", le="5.0"}'
+        values: '0x60'
+      - series: 'vllm:e2e_request_latency_seconds_bucket{namespace="llm", service="llm-vllm", le="10.0"}'
+        values: '0+10x60'
+      - series: 'vllm:e2e_request_latency_seconds_bucket{namespace="llm", service="llm-vllm", le="+Inf"}'
+        values: '0+10x60'
+    promql_expr_test:
+      - expr: llm:e2e_latency_seconds:p95_5m
+        eval_time: 20m
+        exp_samples:
+          - labels: 'llm:e2e_latency_seconds:p95_5m'
+            value: 9.75 # linear interpolation inside the (5, 10] bucket
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: LLMLatencyP95High
+        exp_alerts:
+          - exp_labels: { severity: warning }
+            exp_annotations:
+              summary: "p95 end-to-end latency above 5s"
+              description: "p95 is 9.75s."
+              runbook_url: "https://github.com/zohaib85/MLOps-Project/blob/main/docs/runbook.md#llmlatencyp95high"
+
+  # Pod stuck Pending (no GPU node) for 10 minutes.
+  - interval: 1m
+    input_series:
+      - series: 'kube_pod_status_phase{namespace="llm", pod="llm-vllm-abc", phase="Pending"}'
+        values: '1x20'
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: LLMPodPending
+        exp_alerts:
+          - exp_labels: { severity: warning }
+            exp_annotations:
+              summary: "Inference pod Pending — usually no schedulable GPU node"
+              description: "Check GPU pool size (make gpu-on), taints/tolerations and nvidia.com/gpu allocatable."
+              runbook_url: "https://github.com/zohaib85/MLOps-Project/blob/main/docs/runbook.md#llmpodpending"

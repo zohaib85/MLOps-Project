@@ -1,0 +1,101 @@
+{{- if and .Values.metrics.prometheusRule.enabled (.Capabilities.APIVersions.Has "monitoring.coreos.com/v1") }}
+{{- $fullname := include "vllm.fullname" . }}
+{{- $ns := .Release.Namespace }}
+{{- $sel := printf "namespace=%q, service=%q" $ns $fullname }}
+{{- $chat := printf "%s, handler=\"/v1/chat/completions\"" $sel }}
+{{- $budget := subf 1 .Values.metrics.slo.availabilityTarget }}
+{{- $rb := .Values.metrics.runbookBaseUrl }}
+# SLO recording rules + alerts. Metric names: observability/vllm-metrics-v0.29.0.txt.
+# Prometheus template expressions in annotations are wrapped in backticks so Helm leaves them alone.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ $fullname }}
+  labels:
+    {{- include "vllm.labels" . | nindent 4 }}
+    {{- with .Values.metrics.prometheusRule.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  groups:
+    - name: llm-slo.recording
+      interval: 30s
+      rules:
+        - record: llm:requests:rate5m
+          expr: sum(rate(http_requests_total{ {{- $chat -}} }[5m]))
+        - record: llm:errors:ratio_rate5m
+          expr: |
+            sum(rate(http_requests_total{ {{- $chat -}}, status="5xx"}[5m]))
+            / clamp_min(sum(rate(http_requests_total{ {{- $chat -}} }[5m])), 1e-9)
+        - record: llm:errors:ratio_rate1h
+          expr: |
+            sum(rate(http_requests_total{ {{- $chat -}}, status="5xx"}[1h]))
+            / clamp_min(sum(rate(http_requests_total{ {{- $chat -}} }[1h])), 1e-9)
+        - record: llm:e2e_latency_seconds:p95_5m
+          expr: histogram_quantile(0.95, sum by (le) (rate(vllm:e2e_request_latency_seconds_bucket{ {{- $sel -}} }[5m])))
+        - record: llm:ttft_seconds:p95_5m
+          expr: histogram_quantile(0.95, sum by (le) (rate(vllm:time_to_first_token_seconds_bucket{ {{- $sel -}} }[5m])))
+        - record: llm:generation_tokens:rate5m
+          expr: sum(rate(vllm:generation_tokens_total{ {{- $sel -}} }[5m]))
+
+    - name: llm-slo.alerts
+      rules:
+        - alert: LLMEndpointDown
+          expr: (max(up{ {{- $sel -}} }) or vector(0)) == 0
+          for: 5m
+          labels: { severity: critical }
+          annotations:
+            summary: "Inference endpoint {{ $fullname }} is not being scraped / not up"
+            description: "No healthy /metrics target for 5m — the server is down, restarting, or still loading the model."
+            runbook_url: "{{ $rb }}#llmendpointdown"
+        # Multi-window burn rate: 14.4x budget burn over both 1h and 5m (fast-burn page).
+        - alert: LLMErrorBudgetFastBurn
+          expr: |
+            llm:errors:ratio_rate1h > {{ round (mulf 14.4 $budget) 6 }}
+            and llm:errors:ratio_rate5m > {{ round (mulf 14.4 $budget) 6 }}
+          for: 2m
+          labels: { severity: critical }
+          annotations:
+            summary: "5xx error ratio is burning the {{ .Values.metrics.slo.availabilityTarget }} availability SLO budget fast"
+            description: {{`"5m error ratio {{ $value | humanizePercentage }}."`}}
+            runbook_url: "{{ $rb }}#llmerrorbudgetfastburn"
+        - alert: LLMLatencyP95High
+          expr: llm:e2e_latency_seconds:p95_5m > {{ .Values.metrics.slo.latencyP95Seconds }}
+          for: 10m
+          labels: { severity: warning }
+          annotations:
+            summary: "p95 end-to-end latency above {{ .Values.metrics.slo.latencyP95Seconds }}s"
+            description: {{`"p95 is {{ $value | humanizeDuration }}."`}}
+            runbook_url: "{{ $rb }}#llmlatencyp95high"
+        - alert: LLMQueueBacklog
+          expr: max(vllm:num_requests_waiting{ {{- $sel -}} }) > {{ .Values.metrics.alerts.queueWaitingThreshold }}
+          for: 5m
+          labels: { severity: warning }
+          annotations:
+            summary: "Requests are queueing for an engine slot"
+            description: {{`"{{ $value }} requests waiting."`}}
+            runbook_url: "{{ $rb }}#llmqueuebacklog"
+        - alert: LLMKVCacheSaturated
+          expr: max(vllm:kv_cache_usage_perc{ {{- $sel -}} }) > {{ .Values.metrics.alerts.kvCacheUsageThreshold }}
+          for: 10m
+          labels: { severity: warning }
+          annotations:
+            summary: "KV cache nearly full — preemptions and latency will rise"
+            description: {{`"KV cache usage {{ $value | humanizePercentage }}."`}}
+            runbook_url: "{{ $rb }}#llmkvcachesaturated"
+        - alert: LLMPodRestarting
+          expr: increase(kube_pod_container_status_restarts_total{namespace="{{ $ns }}", pod=~"{{ $fullname }}-.*"}[15m]) > 2
+          labels: { severity: warning }
+          annotations:
+            summary: "Inference pod restarting (OOM, crash loop, or failed probes)"
+            description: {{`"{{ $labels.pod }} restarted {{ $value }} times in 15m."`}}
+            runbook_url: "{{ $rb }}#llmpodrestarting"
+        - alert: LLMPodPending
+          expr: max(kube_pod_status_phase{namespace="{{ $ns }}", pod=~"{{ $fullname }}-.*", phase="Pending"}) == 1
+          for: 10m
+          labels: { severity: warning }
+          annotations:
+            summary: "Inference pod Pending — usually no schedulable GPU node"
+            description: "Check GPU pool size (make gpu-on), taints/tolerations and nvidia.com/gpu allocatable."
+            runbook_url: "{{ $rb }}#llmpodpending"
+{{- end }}

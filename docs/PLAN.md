@@ -43,9 +43,9 @@ Build window: 24 Sep – 21 Oct 2026 · ~8–10 h/week · personal learning proj
 - [ ] 10. Exit gate: Git change → traceable release; previous version restorable
 
 ### Week 3 — Observe + harden (exit: dashboard + drill)
-- [ ] 11. kube-prometheus-stack, vLLM ServiceMonitor, DCGM exporter
-- [ ] 12. One Grafana dashboard (service → inference → resources)
-- [ ] 13. SLOs + alert rules + runbook
+- [ ] 11. kube-prometheus-stack, vLLM ServiceMonitor, DCGM exporter ([guide](learning/step11-observability.md)) — values, chart objects, tests done; kind/AKS run pending
+- [ ] 12. One Grafana dashboard (service → inference → resources) — `charts/vllm/dashboards/llm-inference.json`, shipped via Argo CD; screenshots pending
+- [x] 13. SLOs + alert rules + runbook — [SLOs](slo.md), [runbook](runbook.md), promtool alert tests in CI
 - [ ] 14. Drills: pod deletion; failing release → health gate → rollback
 
 ### Week 4 — Measure + publish (exit: demo + career package)

@@ -16,6 +16,8 @@ tf_out = $(shell $(TF) output -raw $(1) 2>/dev/null)
 CONFTEST     ?= conftest
 KUBECONFORM  ?= kubeconform
 ENVS         := kind aks
+# Pretend the Prometheus Operator CRDs exist so offline renders include ServiceMonitor/PrometheusRule.
+API_VERSIONS ?= --api-versions monitoring.coreos.com/v1
 # Value files per environment (order matters: later files override earlier ones).
 values_files = -f charts/vllm/values-model.yaml -f deploy/envs/$(1)/values.yaml \
   $(if $(wildcard deploy/envs/$(1)/harness-image.yaml),-f deploy/envs/$(1)/harness-image.yaml)
@@ -37,7 +39,7 @@ endef
 
 .PHONY: help
 help: ## Show available targets
-	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
+	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
 ## --- Week 1: inference baseline ---
 .PHONY: serve stop logs clean-local smoke test
@@ -71,9 +73,9 @@ values: ## Regenerate charts/vllm/values-model.yaml from config/model.yaml
 chart-lint: ## helm lint the chart for every environment
 	$(foreach e,$(ENVS),$(HELM) lint --strict charts/vllm $(call values_files,$(e)) &&) true
 validate: ## Render each env; check schemas (kubeconform) and policy (conftest)
-	$(foreach e,$(ENVS),$(HELM) template $(RELEASE) charts/vllm -n $(NAMESPACE) $(call values_files,$(e)) \
+	$(foreach e,$(ENVS),$(HELM) template $(RELEASE) charts/vllm -n $(NAMESPACE) $(API_VERSIONS) $(call values_files,$(e)) \
 	  | $(KUBECONFORM) -strict -summary -ignore-missing-schemas - && \
-	  $(HELM) template $(RELEASE) charts/vllm -n $(NAMESPACE) $(call values_files,$(e)) \
+	  $(HELM) template $(RELEASE) charts/vllm -n $(NAMESPACE) $(API_VERSIONS) $(call values_files,$(e)) \
 	  | $(CONFTEST) test -p policy - &&) true
 policy-test: ## Unit-test the Rego policies
 	$(CONFTEST) verify -p policy
@@ -143,6 +145,42 @@ gpu-on: ## Scale the GPU pool to 1 node (billing for the T4 starts now)
 	az aks nodepool scale -g $(call tf_out,resource_group) --cluster-name $(call tf_out,cluster_name) -n gpu --node-count 1
 gpu-off: ## Scale the GPU pool to 0 nodes (stop paying for the GPU)
 	az aks nodepool scale -g $(call tf_out,resource_group) --cluster-name $(call tf_out,cluster_name) -n gpu --node-count 0
+
+## --- Week 3: observability ---
+.PHONY: rules-test monitoring-install monitoring-uninstall dcgm-install grafana-ui grafana-password prom-ui alertmanager-ui load
+PROMTOOL     ?= promtool
+KPS_VERSION  ?= 92.2.0
+DCGM_VERSION ?= 4.8.4
+MON_NS       ?= monitoring
+LOAD_ARGS    ?= --concurrency 4 --duration 120
+rules-test: ## Render the chart's alert rules and unit-test them with promtool (observability/tests)
+	@T=$$(mktemp -d) && \
+	$(HELM) template $(RELEASE) charts/vllm -n $(NAMESPACE) $(API_VERSIONS) $(call values_files,aks) \
+	  --show-only templates/prometheusrule.yaml \
+	  | $(PYTHON) -c 'import sys,yaml; d=yaml.safe_load(sys.stdin); yaml.safe_dump({"groups": d["spec"]["groups"]}, sys.stdout)' \
+	  > $$T/rules.yaml && cp observability/tests/alerts-test.yaml $$T/ && \
+	$(PROMTOOL) check rules $$T/rules.yaml && $(PROMTOOL) test rules $$T/alerts-test.yaml; RC=$$?; rm -rf $$T; exit $$RC
+monitoring-install: ## Install kube-prometheus-stack (pinned) into namespace monitoring
+	@echo "context: $$(kubectl config current-context)"
+	$(HELM) upgrade --install kps kube-prometheus-stack --repo https://prometheus-community.github.io/helm-charts \
+	  --version $(KPS_VERSION) -n $(MON_NS) --create-namespace \
+	  -f observability/kube-prometheus-stack-values.yaml --wait --timeout 10m
+monitoring-uninstall: ## Remove kube-prometheus-stack (CRDs stay; delete them by hand if you want a clean slate)
+	$(HELM) uninstall kps -n $(MON_NS)
+dcgm-install: ## Install NVIDIA dcgm-exporter (GPU metrics) — pods appear only on GPU nodes
+	$(HELM) upgrade --install dcgm dcgm-exporter --repo https://nvidia.github.io/dcgm-exporter/helm-charts \
+	  --version $(DCGM_VERSION) -n $(MON_NS) --create-namespace -f observability/dcgm-exporter-values.yaml
+grafana-ui: ## Grafana on http://localhost:3000 (user admin, password: make grafana-password)
+	kubectl -n $(MON_NS) port-forward svc/kps-grafana 3000:80
+grafana-password: ## Print the generated Grafana admin password
+	@kubectl -n $(MON_NS) get secret kps-grafana -o jsonpath='{.data.admin-password}' | base64 -d; echo
+prom-ui: ## Prometheus on http://localhost:9090 (targets, rules, alerts)
+	kubectl -n $(MON_NS) port-forward svc/kps-prometheus 9090:9090
+alertmanager-ui: ## Alertmanager on http://localhost:9093
+	kubectl -n $(MON_NS) port-forward svc/kps-alertmanager 9093:9093
+load: ## Port-forward the inference Service and send closed-loop load (LOAD_ARGS)
+	@kubectl -n $(NAMESPACE) port-forward svc/$(RELEASE)-vllm 8000:8000 >/dev/null 2>&1 & PF=$$!; \
+	sleep 3; $(PYTHON) scripts/loadgen.py $(LOAD_ARGS); RC=$$?; kill $$PF; exit $$RC
 
 ## --- Week 4: evidence ---
 .PHONY: bench

@@ -26,6 +26,7 @@ env:
   HELM_VERSION: v3.19.0
   KUBECONFORM_VERSION: v0.8.0
   CONFTEST_VERSION: 0.60.0
+  PROMETHEUS_VERSION: 3.15.0 # promtool for alert-rule unit tests
   TERRAFORM_VERSION: 1.16.5
   IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/llm-platform-harness
 
@@ -44,6 +45,12 @@ jobs:
       - run: pip install -r requirements-dev.txt
       - run: make lint
       - run: make test
+      - name: Install promtool
+        run: |
+          mkdir -p "$HOME/bin" && echo "$HOME/bin" >> "$GITHUB_PATH"
+          curl -fsSL "https://github.com/prometheus/prometheus/releases/download/v${PROMETHEUS_VERSION}/prometheus-${PROMETHEUS_VERSION}.linux-amd64.tar.gz" \
+            | tar -xz -C "$HOME/bin" --strip-components=1 "prometheus-${PROMETHEUS_VERSION}.linux-amd64/promtool"
+      - run: make rules-test # alert rules fire (and stay quiet) on synthetic series
 
   manifests:
     runs-on: ubuntu-24.04
@@ -66,7 +73,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/scan"
           for e in kind aks; do
             extra=""; [ -f "deploy/envs/$e/harness-image.yaml" ] && extra="-f deploy/envs/$e/harness-image.yaml"
-            helm template llm charts/vllm -n llm -f charts/vllm/values-model.yaml \
+            helm template llm charts/vllm -n llm --api-versions monitoring.coreos.com/v1 -f charts/vllm/values-model.yaml \
               -f "deploy/envs/$e/values.yaml" $extra > "$RUNNER_TEMP/scan/$e.yaml"
           done
           cp app/Dockerfile "$RUNNER_TEMP/scan/Dockerfile"
