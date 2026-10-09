@@ -25,6 +25,9 @@ resource "azurerm_kubernetes_cluster" "this" {
 
   sku_tier = "Free" # no control-plane SLA; Standard adds the uptime SLA for production
 
+  # Kubernetes RBAC (the provider default, stated explicitly; Trivy AZU-0042 checks for it).
+  role_based_access_control_enabled = true
+
   # Pods get Entra ID tokens via federated OIDC — no secrets in the cluster.
   oidc_issuer_enabled       = true
   workload_identity_enabled = true
