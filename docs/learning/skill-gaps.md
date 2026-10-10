@@ -2,7 +2,8 @@
 
 Purpose: come back to this after the build. Each section uses **this repo's real files** as the
 learning material, so you learn the tool from code you already own.
-Suggested order: **Helm → GitHub Actions → Rego** (each builds on the previous). ~3–4 h each.
+Suggested order: **Helm → Prometheus → GitHub Actions → Rego**. ~3–4 h each.
+**Hands-on labs (you do the work, Claude reviews): [hands-on-plan.md](hands-on-plan.md).** This file is the concept reference.
 
 ---
 
@@ -122,7 +123,46 @@ Jobs run **in parallel** unless linked with `needs:`. Nothing is shared between 
 
 ---
 
-## 3. Rego / OPA / conftest (policy as code)
+## 3. Prometheus / PromQL
+
+### Mental model
+```
+app :8000/metrics (plain text)  ◄── scraped every 15s ──  Prometheus (time-series DB + rule engine)
+                                                              ├─► recording rules → alert rules → Alertmanager (routing)
+                                                              └─► Grafana (queries PromQL, draws panels)
+```
+- **Pull, not push:** apps expose `/metrics`; Prometheus fetches it. A missing target is itself a signal (`up`).
+- **Series = name + labels:** `http_requests_total{handler="/v1/chat/completions",status="5xx"}` — every label combination is its own series.
+- **On Kubernetes:** the Prometheus Operator turns `ServiceMonitor` / `PrometheusRule` objects into Prometheus config.
+
+### Core concepts → where they are in this repo
+| Concept | What it is | Look at |
+|---|---|---|
+| Counter / gauge / histogram | Only up / up-and-down / bucketed counts | `observability/vllm-metrics-v0.29.0.txt` |
+| `rate()` | Per-second increase of a counter over a window | every `rate(...[5m])` in `prometheusrule.yaml` |
+| `histogram_quantile` | Percentile estimate from buckets | `llm:e2e_latency_seconds:p95_5m` |
+| Aggregation | `sum by (status) (...)`, `max(...)` | dashboard queries |
+| Recording rule | Pre-computed query stored as a new series | `llm:*` rules |
+| Alert rule + `for:` | Condition that must hold for a duration before firing | `LLM*` alerts |
+| Absent data | No series ≠ 0; `or vector(0)` | `LLMEndpointDown` |
+| ServiceMonitor | "Scrape the pods behind Services with these labels, on this port name" | `templates/servicemonitor.yaml` |
+| promtool | Lint + unit-test rules offline | `make rules-test`, `observability/tests/alerts-test.yaml` |
+
+### Self-check
+- Counter vs gauge vs histogram — one vLLM example of each?
+- Why does a burn-rate alert use two windows?
+- Why can't `up == 0` catch a deleted pod?
+- What does a ServiceMonitor select, and which port name must match?
+
+### Resources
+- Querying basics: https://prometheus.io/docs/prometheus/latest/querying/basics/
+- Metric types: https://prometheus.io/docs/concepts/metric_types/
+- Unit-testing rules: https://prometheus.io/docs/prometheus/latest/configuration/unit_testing_rules/
+- SRE workbook, Alerting on SLOs: https://sre.google/workbook/alerting-on-slos/
+
+---
+
+## 4. Rego / OPA / conftest (policy as code)
 
 ### Mental model
 - **OPA** = a general policy engine. **Rego** = its language. **conftest** = a CLI that runs Rego
@@ -178,9 +218,8 @@ Gotcha we hit: conftest treats rules named `violation` like `deny` — that's wh
 |---|---|---|---|
 | Helm | ☐ | ☐ | ☐ |
 | GitHub Actions | ☐ | ☐ | ☐ |
+| Prometheus / PromQL | ☐ | ☐ | ☐ |
 | Rego / conftest | ☐ | ☐ | ☐ |
 
 Later additions to this list as we go: **Argo CD** (step 8 — start with docs/learning/step8-argocd.md), **Terraform for AKS** (step 9 — start with docs/learning/step9-terraform.md),
-**Prometheus/PromQL** (week 3 — start with docs/learning/step11-observability.md "Things to try";
-then https://prometheus.io/docs/prometheus/latest/querying/basics/ and the SRE workbook chapter
-"Alerting on SLOs": https://sre.google/workbook/alerting-on-slos/).
+**Prometheus/PromQL** (now section 3 above).
