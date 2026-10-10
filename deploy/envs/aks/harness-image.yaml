@@ -3,5 +3,5 @@
 mock:
   image:
     repository: ghcr.io/zohaib85/llm-platform-harness
-    tag: sha-a520200719147d46e84d9345f9e08797908caf2c
-    digest: "sha256:81c1c8a10aeee030d4cabaf1e8adee14125646daaf3871d8654485ca4870f6e7"
+    tag: sha-9e4207033e55cf5e5f0f52a16f52daea59539626
+    digest: "sha256:8b550996198bcec38def8b20e1742df323acf2ce30bba7e68f9f2c37f297dd10"
