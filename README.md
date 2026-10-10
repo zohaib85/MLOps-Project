@@ -83,6 +83,7 @@ curl -s localhost:8000/v1/chat/completions -H 'Content-Type: application/json' -
 - [Step 8 — GitOps with Argo CD](docs/learning/step8-argocd.md)
 - [Step 9 — Terraform for AKS](docs/learning/step9-terraform.md)
 - [Steps 11–13 — Observability, SLOs, alerts](docs/learning/step11-observability.md)
+- [AKS runbook — platform, GitOps release gate, observability, drills](docs/learning/aks-runbook.md)
 - [SLOs](docs/slo.md) · [Runbook](docs/runbook.md)
 - [Skill gaps — Helm, GitHub Actions, Rego study plan](docs/learning/skill-gaps.md)
 
