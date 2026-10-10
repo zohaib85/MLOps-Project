@@ -145,6 +145,18 @@ gpu-on: ## Scale the GPU pool to 1 node (billing for the T4 starts now)
 	az aks nodepool scale -g $(call tf_out,resource_group) --cluster-name $(call tf_out,cluster_name) -n gpu --node-count 1
 gpu-off: ## Scale the GPU pool to 0 nodes (stop paying for the GPU)
 	az aks nodepool scale -g $(call tf_out,resource_group) --cluster-name $(call tf_out,cluster_name) -n gpu --node-count 0
+.PHONY: aks-check gpu-plugin argocd-apps-aks aks-smoke
+aks-check: ## Refuse to continue unless kubectl points at the Terraform-managed AKS cluster
+	@C=$$(kubectl config current-context); T="$(call tf_out,cluster_name)"; \
+	test -n "$$T" && test "$$C" = "$$T" || { echo "kubectl context '$$C' is not the AKS cluster '$$T' — run: make aks-credentials"; exit 1; }; \
+	echo "context: $$C ✔"
+gpu-plugin: aks-check ## Install the NVIDIA device plugin (AKS installs the driver; this advertises nvidia.com/gpu)
+	kubectl apply -f deploy/lab/nvidia-device-plugin.yaml
+argocd-apps-aks: aks-check ## Register the AppProject + AKS Application (Argo CD then syncs vLLM from Git)
+	kubectl apply -f deploy/argocd/project.yaml -f deploy/argocd/app-aks.yaml
+aks-smoke: aks-check ## Port-forward the AKS Service and run the full smoke suite (incl. prompt-set pass rate)
+	@kubectl -n $(NAMESPACE) port-forward svc/$(RELEASE)-vllm 8000:8000 >/dev/null 2>&1 & PF=$$!; \
+	sleep 3; $(PYTHON) -m pytest tests/smoke -v; RC=$$?; kill $$PF; exit $$RC
 
 ## --- Week 3: observability ---
 .PHONY: rules-test monitoring-install monitoring-uninstall dcgm-install grafana-ui grafana-password prom-ui alertmanager-ui load

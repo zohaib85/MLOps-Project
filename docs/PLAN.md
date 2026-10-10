@@ -16,6 +16,7 @@ Build window: 24 Sep – 21 Oct 2026 · ~8–10 h/week · personal learning proj
 | GitOps | Argo CD, same repo, `deploy/` path | CI commits digest bump; CI never holds cluster creds |
 | Gateway | vLLM `--api-key` + ingress-nginx rate limits | Minimal; Envoy Gateway deferred |
 | Local dev | WSL2 + Docker on RTX A2000 8GB; kind for cluster work | Laptop GPU for dev; T4 on AKS for evidence runs |
+| Cluster work (from 10 Oct) | **AKS only** — kind dropped | All remaining steps follow [the AKS runbook](learning/aks-runbook.md) |
 
 ## Steps
 
@@ -38,15 +39,15 @@ Build window: 24 Sep – 21 Oct 2026 · ~8–10 h/week · personal learning proj
 ### Week 2 — Kubernetes + GitOps (exit: reproducible release)
 - [x] 6. Helm chart `charts/vllm`: GPU request, probes, securityContext, NetworkPolicy, SA, model-cache PVC ([guide](learning/step6-helm-chart.md))
 - [x] 7. CI: pytest, helm lint/template, kubeconform, policy check, Trivy, gitleaks, publish by digest, digest bump ([guide](learning/step7-ci.md)) — green on PR #2
-- [ ] 8. Argo CD Application + AppProject (kind first, then AKS) ([guide](learning/step8-argocd.md)) — manifests + tests done; kind run pending
-- [ ] 9. Terraform: AKS + GPU pool + budget alert; `make infra-down` teardown ([guide](learning/step9-terraform.md)) — code + CI validation done; first apply pending
-- [ ] 10. Exit gate: Git change → traceable release; previous version restorable
+- [ ] 8. Argo CD Application + AppProject (kind first, then AKS) ([guide](learning/step8-argocd.md)) — manifests + tests done; AKS run pending ([runbook](learning/aks-runbook.md) part B)
+- [x] 9. Terraform: AKS + GPU pool + budget alert; `make infra-down` teardown ([guide](learning/step9-terraform.md)) — applied on Azure
+- [ ] 10. Exit gate: Git change → traceable release; previous version restorable ([runbook](learning/aks-runbook.md) part C)
 
 ### Week 3 — Observe + harden (exit: dashboard + drill)
-- [ ] 11. kube-prometheus-stack, vLLM ServiceMonitor, DCGM exporter ([guide](learning/step11-observability.md)) — values, chart objects, tests done; kind/AKS run pending
+- [ ] 11. kube-prometheus-stack, vLLM ServiceMonitor, DCGM exporter ([guide](learning/step11-observability.md)) — values, chart objects, tests done; AKS run pending (runbook part D)
 - [ ] 12. One Grafana dashboard (service → inference → resources) — `charts/vllm/dashboards/llm-inference.json`, shipped via Argo CD; screenshots pending
 - [x] 13. SLOs + alert rules + runbook — [SLOs](slo.md), [runbook](runbook.md), promtool alert tests in CI
-- [ ] 14. Drills: pod deletion; failing release → health gate → rollback
+- [ ] 14. Drills: pod deletion; failing release → health gate → rollback ([runbook](learning/aks-runbook.md) part E)
 
 ### Week 4 — Measure + publish (exit: demo + career package)
 - [ ] 15. k6/Locust at several concurrency levels → benchmark report
