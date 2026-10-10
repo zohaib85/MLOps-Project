@@ -1,0 +1,14 @@
+{{- if .Values.metrics.dashboard.enabled }}
+# Grafana's dashboard sidecar (kube-prometheus-stack) loads every ConfigMap labelled
+# grafana_dashboard=1 in any namespace — so the dashboard ships with the app, through GitOps.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "vllm.fullname" . }}-dashboard
+  labels:
+    {{- include "vllm.labels" . | nindent 4 }}
+    grafana_dashboard: "1"
+data:
+  llm-inference.json: |-
+{{ .Files.Get "dashboards/llm-inference.json" | indent 4 }}
+{{- end }}

@@ -60,6 +60,8 @@ def test_project_allows_every_kind_the_chart_renders(repo_root):
             str(repo_root / "deploy/envs/aks/values.yaml"),
             "--set",
             "test.enabled=false",
+            "--api-versions",
+            "monitoring.coreos.com/v1",  # as on a cluster with kube-prometheus-stack installed
         ],
         check=True,
         capture_output=True,

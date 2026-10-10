@@ -39,13 +39,13 @@ Build window: 24 Sep – 21 Oct 2026 · ~8–10 h/week · personal learning proj
 - [x] 6. Helm chart `charts/vllm`: GPU request, probes, securityContext, NetworkPolicy, SA, model-cache PVC ([guide](learning/step6-helm-chart.md))
 - [x] 7. CI: pytest, helm lint/template, kubeconform, policy check, Trivy, gitleaks, publish by digest, digest bump ([guide](learning/step7-ci.md)) — green on PR #2
 - [ ] 8. Argo CD Application + AppProject (kind first, then AKS) ([guide](learning/step8-argocd.md)) — manifests + tests done; kind run pending
-- [ ] 9. Terraform: AKS + GPU pool + budget alert; `make down` teardown
+- [ ] 9. Terraform: AKS + GPU pool + budget alert; `make infra-down` teardown ([guide](learning/step9-terraform.md)) — code + CI validation done; first apply pending
 - [ ] 10. Exit gate: Git change → traceable release; previous version restorable
 
 ### Week 3 — Observe + harden (exit: dashboard + drill)
-- [ ] 11. kube-prometheus-stack, vLLM ServiceMonitor, DCGM exporter
-- [ ] 12. One Grafana dashboard (service → inference → resources)
-- [ ] 13. SLOs + alert rules + runbook
+- [ ] 11. kube-prometheus-stack, vLLM ServiceMonitor, DCGM exporter ([guide](learning/step11-observability.md)) — values, chart objects, tests done; kind/AKS run pending
+- [ ] 12. One Grafana dashboard (service → inference → resources) — `charts/vllm/dashboards/llm-inference.json`, shipped via Argo CD; screenshots pending
+- [x] 13. SLOs + alert rules + runbook — [SLOs](slo.md), [runbook](runbook.md), promtool alert tests in CI
 - [ ] 14. Drills: pod deletion; failing release → health gate → rollback
 
 ### Week 4 — Measure + publish (exit: demo + career package)

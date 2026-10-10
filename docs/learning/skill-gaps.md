@@ -180,5 +180,7 @@ Gotcha we hit: conftest treats rules named `violation` like `deny` — that's wh
 | GitHub Actions | ☐ | ☐ | ☐ |
 | Rego / conftest | ☐ | ☐ | ☐ |
 
-Later additions to this list as we go: **Argo CD** (step 8 — start with docs/learning/step8-argocd.md), **Terraform for AKS** (step 9),
-**Prometheus/PromQL** (week 3).
+Later additions to this list as we go: **Argo CD** (step 8 — start with docs/learning/step8-argocd.md), **Terraform for AKS** (step 9 — start with docs/learning/step9-terraform.md),
+**Prometheus/PromQL** (week 3 — start with docs/learning/step11-observability.md "Things to try";
+then https://prometheus.io/docs/prometheus/latest/querying/basics/ and the SRE workbook chapter
+"Alerting on SLOs": https://sre.google/workbook/alerting-on-slos/).

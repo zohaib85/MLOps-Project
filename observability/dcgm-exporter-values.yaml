@@ -1,0 +1,27 @@
+# NVIDIA dcgm-exporter (chart 4.8.4) — GPU utilisation, memory, power, temperature as Prometheus metrics.
+# Runs only on the GPU node. Install any time with `make dcgm-install` (namespace `monitoring`):
+# the DaemonSet simply has 0 pods while the GPU pool is scaled to 0 nodes.
+image:
+  repository: nvcr.io/nvidia/k8s/dcgm-exporter
+  tag: 4.6.1-4.8.4-distroless # chart default, pinned explicitly so a chart bump can't change it silently
+
+# Same placement rules as the vLLM pod (infra/terraform: label workload=gpu, taint sku=gpu:NoSchedule).
+nodeSelector:
+  workload: gpu
+tolerations:
+  - key: sku
+    operator: Equal
+    value: gpu
+    effect: NoSchedule
+
+serviceMonitor:
+  enabled: true
+  interval: 15s # match vLLM's scrape interval so panels line up
+  scrapeTimeout: 10s
+
+resources:
+  requests: { cpu: 50m, memory: 128Mi }
+  limits: { memory: 512Mi }
+# Chart default securityContext keeps root + SYS_ADMIN (needed for DCGM_FI_PROF_* profiling metrics).
+# The metrics we chart (GPU_UTIL, FB_USED/FREE, POWER_USAGE, GPU_TEMP) don't need it; dropping it is a
+# documented hardening option once the dashboard is confirmed on the T4.

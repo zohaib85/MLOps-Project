@@ -20,5 +20,8 @@ spec:
     - { group: "", kind: ServiceAccount }
     - { group: "", kind: Service }
     - { group: "", kind: PersistentVolumeClaim }
+    - { group: "", kind: ConfigMap }   # Week 3: Grafana dashboard
     - { group: apps, kind: Deployment }
     - { group: networking.k8s.io, kind: NetworkPolicy }
+    - { group: monitoring.coreos.com, kind: ServiceMonitor }   # Week 3: scrape config
+    - { group: monitoring.coreos.com, kind: PrometheusRule }   # Week 3: SLO recording rules + alerts

@@ -17,3 +17,7 @@ modelCache:
 resources:
   requests: { cpu: "2", memory: 8Gi }
   limits: { memory: 20Gi }
+metrics:
+  serviceMonitor: { enabled: true }
+  prometheusRule: { enabled: true }
+  dashboard: { enabled: true }

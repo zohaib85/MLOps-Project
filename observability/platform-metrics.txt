@@ -1,0 +1,16 @@
+# Non-vLLM series referenced by the dashboard and alert rules, by source.
+# Dashboards and alert rules may only reference names in this file or vllm-metrics-v0.29.0.txt
+# (tests/unit/test_observability.py).
+# Prometheus (every scrape target)
+up
+# kube-state-metrics (kube-prometheus-stack 92.2.0)
+kube_pod_container_status_restarts_total
+kube_pod_status_phase
+# kubelet / cAdvisor (kube-prometheus-stack 92.2.0)
+container_memory_working_set_bytes
+# dcgm-exporter 4.8.4 (etc/default-counters.csv); labels include gpu, UUID, Hostname, modelName
+DCGM_FI_DEV_GPU_UTIL
+DCGM_FI_DEV_FB_USED
+DCGM_FI_DEV_FB_FREE
+DCGM_FI_DEV_POWER_USAGE
+DCGM_FI_DEV_GPU_TEMP
